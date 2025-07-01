@@ -7,11 +7,23 @@ from config import TP_MULTIPLIERS, SL_MULTIPLIER, TRAILING_START_AFTER_TP, TRAIL
 def build_fake_trade(signal, candle, atr):
     entry = candle["close"]
     side = signal["direction"]
-    sl = entry - atr * SL_MULTIPLIER if side == "LONG" else entry + atr * SL_MULTIPLIER
+    is_long = side == "LONG"
+
+    # Base TP and SL calculations
+    sl = entry - atr * SL_MULTIPLIER if is_long else entry + atr * SL_MULTIPLIER
     tp_levels = [
-        entry + atr * mult if side == "LONG" else entry - atr * mult
+        entry + atr * mult if is_long else entry - atr * mult
         for mult in TP_MULTIPLIERS
     ]
+
+    # === Optional Safety: Enforce minimum TP spread (e.g. 0.1%)
+    MIN_TP_SPREAD = 0.001  # 0.1%
+    spread = abs(tp_levels[0] - entry) / entry
+    if spread < MIN_TP_SPREAD:
+        scale = (entry * MIN_TP_SPREAD) / abs(tp_levels[0] - entry)
+        tp_levels = [entry + (tp - entry) * scale for tp in tp_levels]
+        sl = entry - (entry - sl) * scale if is_long else entry + (sl - entry) * scale
+
     print(f"📊 {signal['symbol']} trade setup → SL: {sl:.2f}, TP1: {tp_levels[0]:.2f}, TP2: {tp_levels[1]:.2f}, TP3: {tp_levels[2]:.2f}")
 
     return {
@@ -35,6 +47,7 @@ def build_fake_trade(signal, candle, atr):
     }
 
 
+
 def update_position_status(trade, candle):
     high = candle["high"]
     low = candle["low"]
@@ -44,14 +57,15 @@ def update_position_status(trade, candle):
     if trade["status"] != "open":
         return trade
 
-    # === SL Hit (based on high/low wick) ===
-    if (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"]):
+    # === SL Hit (directional wick logic)
+    sl_hit = (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"])
+    if sl_hit:
         trade["exit_price"] = trade["sl"]
         trade["status"] = "closed"
         trade["exit_reason"] = "SL"
         return trade
 
-    # === TP Hits (check if price wick touched target) ===
+    # === TP Hits
     for i, tp in enumerate(trade["tp"]):
         if i in trade["hit"]:
             continue
@@ -61,18 +75,16 @@ def update_position_status(trade, candle):
             trade["hit"].append(i)
             print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
 
-            # If final TP hit → close
             if i == len(trade["tp"]) - 1:
                 trade["exit_price"] = tp
                 trade["status"] = "closed"
                 trade["exit_reason"] = f"TP{i+1}"
                 return trade
 
-            # Enable trailing SL if TP1 or later
             if i >= TRAILING_START_AFTER_TP:
                 trade["trailing"]["enabled"] = True
 
-    # === Trailing SL Logic ===
+    # === Trailing SL
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
         current_price = candle["close"]
@@ -85,7 +97,7 @@ def update_position_status(trade, candle):
             if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
                 trail["sl"] = new_sl
 
-        # Check if trailing SL hit
+        # Trailing SL hit?
         if (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"]):
             trade["exit_price"] = trail["sl"]
             trade["status"] = "closed"
@@ -93,4 +105,5 @@ def update_position_status(trade, candle):
             return trade
 
     return trade
+
 
