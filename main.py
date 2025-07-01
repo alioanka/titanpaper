@@ -20,6 +20,9 @@ recently_closed_symbols = set()
 
 def run_bot():
     global open_trades
+    symbol_cooldowns = {}  # Track cooldown times for each symbol
+    COOLDOWN_SECONDS = 90  # Adjust as needed (e.g., 60–180 seconds)
+
     print(f"🚀 Starting {BOT_NAME} in {MODE.upper()} mode...")
     print("🔄 Sending Telegram startup notice...")
     send_startup_notice()
@@ -39,6 +42,12 @@ def run_bot():
 
                 # Step 1: Check existing trades (close if needed)
                 open_trades = check_open_trades(open_trades, candle)
+                # Register cooldown for any just-closed trades
+                for t in open_trades:
+                    if t.get("just_closed"):
+                        symbol_cooldowns[t["symbol"]] = time.time() + COOLDOWN_SECONDS
+                        t.pop("just_closed", None)
+
 
                 # Step 2: Prevent immediate re-entry into just-closed symbols
                 if symbol in recently_closed_symbols:
@@ -47,6 +56,11 @@ def run_bot():
 
                 # Step 3: If no open trade, maybe open one
                 is_open = any(t['symbol'] == symbol and t['status'] == 'open' for t in open_trades)
+                cooldown_expiry = symbol_cooldowns.get(symbol)
+                now = time.time()
+                if cooldown_expiry and now < cooldown_expiry:
+                    print(f"⏳ {symbol} still in cooldown — skipping new entry.")
+                    continue
                 if not is_open:
                     signal = generate_signal(symbol, candle)
                     if signal:

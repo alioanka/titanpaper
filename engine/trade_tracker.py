@@ -39,6 +39,8 @@ def check_open_trades(open_trades, current_candle):
         updated = update_position_status(trade, current_candle)
 
         if updated["status"] == "closed":
+            updated["just_closed"] = True  # Mark for cooldown
+
             log_exit(updated)
             update_journal(updated)
 

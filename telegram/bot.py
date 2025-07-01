@@ -75,7 +75,8 @@ def summary(message):
     with open(JOURNAL_PATH, "r") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            if row["timestamp"].startswith(today):
+            if "timestamp" in row and row["timestamp"].startswith(today):
+
                 try:
                     pnl = float(row["pnl"])
                     pnl_sum += pnl
