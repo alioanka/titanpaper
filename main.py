@@ -25,6 +25,8 @@ def run_bot():
         for symbol in SYMBOLS:
             try:
                 candle = get_latest_candle(symbol, TIMEFRAME)
+                print(f"🧠 {symbol} Candle fetched: O={candle['open']} C={candle['close']} H={candle['high']} L={candle['low']}")
+
                 if not candle:
                     print(f"⚠️ Skipping {symbol}: no candle data")
                     continue
@@ -38,12 +40,15 @@ def run_bot():
                 if not is_open:
                     signal = generate_signal(symbol, candle)
                     if signal:
+                        print(f"✅ Signal detected for {symbol}: {signal}")
                         trade = maybe_open_new_trade(signal, candle, open_trades)
                         if trade:
                             trade["strategy"] = signal.get("strategy_name", DEFAULT_STRATEGY_NAME)
                             trade["id"] = str(uuid.uuid4())
                             open_trades.append(trade)
                             log_trade(trade)
+                    else:
+                        print(f"❌ No valid signal for {symbol}")
 
             except Exception as e:
                 print(f"❌ Error for {symbol}: {e}")

@@ -14,6 +14,13 @@ def generate_signal(symbol, candle):
 
     volatility = (candle["high"] - candle["low"]) / open_
 
+    print(f"🧪 {symbol} - Trend: {trend_strength:.4f}, Volatility: {volatility:.4f}")
+    if abs(trend_strength) < MIN_TREND_STRENGTH:
+        print(f"❌ Trend too weak for {symbol}")
+    if volatility < MIN_VOLATILITY:
+        print(f"❌ Volatility too low for {symbol}")
+   
+
     if abs(trend_strength) < MIN_TREND_STRENGTH or volatility < MIN_VOLATILITY:
         return None  # No trade
 
