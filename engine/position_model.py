@@ -35,51 +35,61 @@ def build_fake_trade(signal, candle, atr):
 
 
 def update_position_status(trade, candle):
-    price = candle["close"]
+    high = candle["high"]
+    low = candle["low"]
     side = trade["side"]
     is_long = side == "LONG"
 
     if trade["status"] != "open":
         return trade
 
-    # === SL Hit ===
-    if (is_long and price <= trade["sl"]) or (not is_long and price >= trade["sl"]):
+    # === SL Hit (based on high/low wick) ===
+    if (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"]):
         trade["exit_price"] = trade["sl"]
         trade["status"] = "closed"
         trade["exit_reason"] = "SL"
         return trade
 
-    # === TP Hits ===
+    # === TP Hits (check if price wick touched target) ===
     for i, tp in enumerate(trade["tp"]):
         if i in trade["hit"]:
             continue
-        if (is_long and price >= tp) or (not is_long and price <= tp):
+
+        tp_hit = (is_long and high >= tp) or (not is_long and low <= tp)
+        if tp_hit:
             trade["hit"].append(i)
             print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
+
+            # If final TP hit → close
             if i == len(trade["tp"]) - 1:
                 trade["exit_price"] = tp
                 trade["status"] = "closed"
                 trade["exit_reason"] = f"TP{i+1}"
                 return trade
+
+            # Enable trailing SL if TP1 or later
             if i >= TRAILING_START_AFTER_TP:
                 trade["trailing"]["enabled"] = True
 
     # === Trailing SL Logic ===
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
+        current_price = candle["close"]
+
         if not trail["triggered"]:
             trail["triggered"] = True
-            trail["sl"] = price - trail["sl_gap"] if is_long else price + trail["sl_gap"]
+            trail["sl"] = current_price - trail["sl_gap"] if is_long else current_price + trail["sl_gap"]
         else:
-            new_sl = price - trail["sl_gap"] if is_long else price + trail["sl_gap"]
+            new_sl = current_price - trail["sl_gap"] if is_long else current_price + trail["sl_gap"]
             if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
                 trail["sl"] = new_sl
 
-        # Check trailing SL hit
-        if (is_long and price <= trail["sl"]) or (not is_long and price >= trail["sl"]):
-            trade["exit_price"] = price
+        # Check if trailing SL hit
+        if (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"]):
+            trade["exit_price"] = trail["sl"]
             trade["status"] = "closed"
             trade["exit_reason"] = "TrailingSL"
             return trade
 
     return trade
+
