@@ -21,6 +21,8 @@ def maybe_open_new_trade(signal, candle, open_trades):
         return None
 
     atr = calculate_atr(df)
+    print(f"📐 {symbol} ATR: {atr:.5f}")
+
     if not atr or atr == 0:
         return None
 
@@ -40,6 +42,8 @@ def check_open_trades(open_trades, current_candle):
         updated = update_position_status(trade, current_candle)
 
         if updated["status"] == "closed":
+            print(f"🚪 {updated['symbol']} closed due to {updated.get('exit_reason')} @ {updated.get('exit_price')}")
+
             just_closed.append(updated["symbol"])  # ← track closed symbol
 
             log_exit(updated)

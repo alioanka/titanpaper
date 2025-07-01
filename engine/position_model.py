@@ -12,6 +12,7 @@ def build_fake_trade(signal, candle, atr):
         entry + atr * mult if side == "LONG" else entry - atr * mult
         for mult in TP_MULTIPLIERS
     ]
+    print(f"📊 {signal['symbol']} trade setup → SL: {sl:.2f}, TP1: {tp_levels[0]:.2f}, TP2: {tp_levels[1]:.2f}, TP3: {tp_levels[2]:.2f}")
 
     return {
         "trade_id": str(uuid.uuid4())[:8],
