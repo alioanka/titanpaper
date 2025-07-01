@@ -15,8 +15,11 @@ from threading import Thread
 open_trades = []
 
 def run_bot():
-    print(f"🚀 Starting {BOT_NAME} in PAPER mode...\n")
+    print(f"🚀 Starting {BOT_NAME} in {MODE.upper()} mode...")
+    print("🔄 Sending Telegram startup notice...")
     send_startup_notice()
+    print("✅ Telegram startup notice sent. Starting loop...")
+
 
     while True:
         for symbol in SYMBOLS:
