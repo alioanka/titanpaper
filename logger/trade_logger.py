@@ -1,0 +1,55 @@
+# logger/trade_logger.py
+
+import csv
+import os
+import time
+from config import TRADE_LOG_PATH
+
+def log_trade(trade):
+    fields = [
+        "timestamp", "trade_id", "symbol", "side", "entry_price",
+        "sl", "tp1", "tp2", "tp3", "strategy", "status"
+    ]
+    row = [
+        time.strftime("%Y-%m-%d %H:%M:%S"),
+        trade.get("trade_id"),
+        trade.get("symbol"),
+        trade.get("side"),
+        trade.get("entry_price"),
+        trade.get("sl"),
+        trade["tp"][0] if len(trade["tp"]) > 0 else "",
+        trade["tp"][1] if len(trade["tp"]) > 1 else "",
+        trade["tp"][2] if len(trade["tp"]) > 2 else "",
+        trade.get("strategy", "unknown"),
+        trade.get("status", "open")
+    ]
+
+    write_csv_row(TRADE_LOG_PATH, fields, row)
+
+def log_exit(trade):
+    fields = [
+        "timestamp", "trade_id", "symbol", "side", "exit_price",
+        "status", "exit_reason", "tp_hits", "pnl", "strategy"
+    ]
+    row = [
+        time.strftime("%Y-%m-%d %H:%M:%S"),
+        trade.get("trade_id"),
+        trade.get("symbol"),
+        trade.get("side"),
+        trade.get("exit_price"),
+        trade.get("status"),
+        trade.get("exit_reason"),
+        ",".join([f"TP{i+1}" for i in trade.get("hit", [])]) if trade.get("hit") else "",
+        round(trade.get("pnl", 0.0), 6),
+        trade.get("strategy", "unknown")
+    ]
+
+    write_csv_row(TRADE_LOG_PATH, fields, row)
+
+def write_csv_row(path, fields, row):
+    file_exists = os.path.isfile(path)
+    with open(path, "a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(fields)
+        writer.writerow(row)
