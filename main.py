@@ -40,7 +40,8 @@ def run_bot():
                 if not is_open:
                     signal = generate_signal(symbol, candle)
                     if signal:
-                        print(f"✅ Signal detected for {symbol}: {signal}")
+                        print(f"✅ TRADE SIGNAL: {symbol} | Side: {signal['direction']} | Trend: {signal['confidence']:.4f} | Price: {candle['close']}")
+
                         trade = maybe_open_new_trade(signal, candle, open_trades)
                         if trade:
                             trade["strategy"] = signal.get("strategy_name", DEFAULT_STRATEGY_NAME)
