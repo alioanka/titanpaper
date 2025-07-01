@@ -34,12 +34,13 @@ def check_open_trades(open_trades, current_candle):
     Check open trades for SL/TP/trailing and close/log if needed.
     """
     still_open = []
+    just_closed = []
 
     for trade in open_trades:
         updated = update_position_status(trade, current_candle)
 
         if updated["status"] == "closed":
-            updated["just_closed"] = True  # Mark for cooldown
+            just_closed.append(updated["symbol"])  # ← track closed symbol
 
             log_exit(updated)
             update_journal(updated)
@@ -53,4 +54,5 @@ def check_open_trades(open_trades, current_candle):
         else:
             still_open.append(updated)
 
-    return still_open
+    return still_open, just_closed
+

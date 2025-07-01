@@ -41,12 +41,13 @@ def run_bot():
                     continue
 
                 # Step 1: Check existing trades (close if needed)
-                open_trades = check_open_trades(open_trades, candle)
-                # Register cooldown for any just-closed trades
-                for t in open_trades:
-                    if t.get("just_closed"):
-                        symbol_cooldowns[t["symbol"]] = time.time() + COOLDOWN_SECONDS
-                        t.pop("just_closed", None)
+                open_trades, just_closed = check_open_trades(open_trades, candle)
+
+                # Register cooldown for closed symbols
+                now = time.time()
+                for sym in just_closed:
+                    symbol_cooldowns[sym] = now + COOLDOWN_SECONDS
+
 
 
                 # Step 2: Prevent immediate re-entry into just-closed symbols
