@@ -21,8 +21,9 @@ MIN_VOLATILITY = 0.0003  # % per candle
 ### === PAPER TRADING CONFIG === ###
 INITIAL_BALANCE = 5000.0
 MAX_RISK_PER_TRADE = 0.02  # 2% of balance
-TP_MULTIPLIERS = [1.0, 1.5, 2.5]  # Multiple TP levels (based on ATR)
-SL_MULTIPLIER = 1.0  # Stop-loss distance (ATR)
+TP_MULTIPLIERS = [2.0, 3.0, 4.5]
+SL_MULTIPLIER = 2.5
+MIN_SPREAD_PCT = 0.002  # 0.2%
 TRAILING_START_AFTER_TP = 1  # After TP1, activate trailing
 TRAILING_GAP_ATR = 0.5
 

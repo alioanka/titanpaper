@@ -9,18 +9,24 @@ def build_fake_trade(signal, candle, atr):
     side = signal["direction"]
     is_long = side == "LONG"
 
-    # Base TP and SL calculations
+    # Updated multipliers
+    TP_MULTIPLIERS = [2.0, 3.0, 4.5]
+    SL_MULTIPLIER = 2.5
+    MIN_SPREAD_PCT = 0.002  # 0.2%
+
+    # Calculate initial SL and TP levels based on ATR
     sl = entry - atr * SL_MULTIPLIER if is_long else entry + atr * SL_MULTIPLIER
     tp_levels = [
         entry + atr * mult if is_long else entry - atr * mult
         for mult in TP_MULTIPLIERS
     ]
 
-    # === Optional Safety: Enforce minimum TP spread (e.g. 0.1%)
-    MIN_TP_SPREAD = 0.001  # 0.1%
-    spread = abs(tp_levels[0] - entry) / entry
-    if spread < MIN_TP_SPREAD:
-        scale = (entry * MIN_TP_SPREAD) / abs(tp_levels[0] - entry)
+    # === Minimum spread enforcement (Optional Safety Enhancement)
+    min_tp_distance = entry * MIN_SPREAD_PCT
+    actual_tp1_distance = abs(tp_levels[0] - entry)
+
+    if actual_tp1_distance < min_tp_distance:
+        scale = min_tp_distance / actual_tp1_distance
         tp_levels = [entry + (tp - entry) * scale for tp in tp_levels]
         sl = entry - (entry - sl) * scale if is_long else entry + (sl - entry) * scale
 
@@ -45,6 +51,7 @@ def build_fake_trade(signal, candle, atr):
         "pnl": 0.0,
         "exit_reason": None
     }
+
 
 
 
