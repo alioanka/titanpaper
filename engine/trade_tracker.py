@@ -42,6 +42,8 @@ def check_open_trades(open_trades, current_candle):
         updated = update_position_status(trade, current_candle)
 
         if updated["status"] == "closed":
+            from utils.ml_logger import log_ml_features
+
             print(f"🚪 {updated['symbol']} closed due to {updated.get('exit_reason')} @ {updated.get('exit_price')}")
 
             just_closed.append(updated["symbol"])  # ← track closed symbol
@@ -53,6 +55,8 @@ def check_open_trades(open_trades, current_candle):
             pnl_pct = calc_fake_pnl(updated)
             new_balance = last_balance * (1 + pnl_pct)
             update_balance(new_balance)
+            log_ml_features(updated, updated.get("trend_strength", 0), updated.get("volatility", 0), updated.get("atr", 0))
+
 
             print(f"💰 Balance updated: {last_balance:.2f} → {new_balance:.2f} ({pnl_pct:+.2f}%)")
         else:

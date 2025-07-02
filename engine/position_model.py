@@ -49,7 +49,10 @@ def build_fake_trade(signal, candle, atr):
         "status": "open",
         "hit": [],
         "pnl": 0.0,
-        "exit_reason": None
+        "exit_reason": None,
+        "trend_strength": signal.get("trend_strength", 0),
+        "volatility": signal.get("volatility", 0),
+        "atr": atr
     }
 
 
