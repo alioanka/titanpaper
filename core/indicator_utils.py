@@ -35,16 +35,20 @@ def fetch_recent_candles(symbol, interval="1m", limit=20):
 
 
 def calculate_atr(df, period=14):
-
     if df is None or len(df) < period:
-        print("⚠️ Not enough data to calculate ATR.")
+        print("⚠️ Not enough candles to calculate ATR.")
         return 0.0
-    """
-    Calculate ATR (Average True Range) for a given dataframe.
-    """
+
     df["H-L"] = df["high"] - df["low"]
     df["H-C"] = abs(df["high"] - df["close"].shift())
     df["L-C"] = abs(df["low"] - df["close"].shift())
     df["TR"] = df[["H-L", "H-C", "L-C"]].max(axis=1)
     df["ATR"] = df["TR"].rolling(window=period).mean()
-    return df["ATR"].iloc[-1]
+
+    atr_val = df["ATR"].iloc[-1]
+    if pd.isna(atr_val):
+        print("⚠️ ATR result is NaN — skipping.")
+        return 0.0
+
+    return round(atr_val, 5)
+
