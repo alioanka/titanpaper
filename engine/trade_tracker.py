@@ -29,7 +29,7 @@ def maybe_open_new_trade(signal, candle, open_trades):
     trade = build_fake_trade(signal, candle, atr)
 
     if not trade:
-        print("❌ Failed to build trade object.")
+        print(f"❌ Failed to create trade for {symbol}")
         return None
     print(f"📈 Fake trade opened: {trade['symbol']} {trade['side']} @ {trade['entry_price']}")
     return trade

@@ -11,6 +11,12 @@ def build_fake_trade(signal, candle, atr):
     side = signal["direction"]
     is_long = side == "LONG"
 
+    # ✅ Sanity check
+    if atr is None or atr <= 0 or not isinstance(entry, (int, float)):
+        print(f"⚠️ Invalid ATR or entry for {signal['symbol']} — skipping trade")
+        return None
+
+
     # Updated multipliers
 #    TP_MULTIPLIERS = [2.0, 3.0, 4.5]
 #    SL_MULTIPLIER = 2.5
@@ -33,6 +39,12 @@ def build_fake_trade(signal, candle, atr):
         sl = entry - (entry - sl) * scale if is_long else entry + (sl - entry) * scale
 
     print(f"📊 {signal['symbol']} trade setup → SL: {sl:.2f}, TP1: {tp_levels[0]:.2f}, TP2: {tp_levels[1]:.2f}, TP3: {tp_levels[2]:.2f}")
+
+    # ✅ SL/TP validation
+    if not isinstance(sl, (int, float)) or any(not isinstance(tp, (int, float)) for tp in tp_levels):
+        print(f"⚠️ Invalid SL/TP setup for {signal['symbol']}")
+        return None
+
 
     return {
         "trade_id": str(uuid.uuid4())[:8],
@@ -79,6 +91,14 @@ def update_position_status(trade, candle):
         update_journal(trade)
         update_balance(trade)
         return trade
+
+    # ✅ Protect against malformed TP lists
+    if "tp" not in trade or not isinstance(trade["tp"], list) or len(trade["tp"]) < 3:
+        print(f"⚠️ Corrupt TP structure in trade: {trade}")
+        trade["status"] = "closed"
+        trade["exit_reason"] = "error"
+        return trade
+
 
     # === TP Hits
     for i, tp in enumerate(trade["tp"]):

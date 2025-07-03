@@ -75,37 +75,42 @@ def summary(message):
     import pandas as pd
     import os
 
-    journal_path = "logs/journal.csv"  # update path if needed
+    journal_path = "logs/journal.csv"
     if not os.path.exists(journal_path):
         bot.send_message(message.chat.id, "📄 No journal file found.")
         return
 
-    df = pd.read_csv(journal_path)
+    try:
+        df = pd.read_csv(journal_path)
+        if "timestamp" not in df.columns or "pnl" not in df.columns:
+            raise ValueError("Missing required fields")
 
-    if "timestamp" not in df.columns or "pnl" not in df.columns:
-        bot.send_message(message.chat.id, "❌ Journal file missing required fields.")
-        return
+        # Parse timestamp correctly with known format
+        df["timestamp"] = pd.to_datetime(df["timestamp"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
+        df.dropna(subset=["timestamp"], inplace=True)
+        df["date"] = df["timestamp"].dt.strftime("%Y-%m-%d")
 
-    # Filter today's trades
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    df["date"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m-%d")
-    today_trades = df[df["date"] == today_str]
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_trades = df[df["date"] == today_str]
 
-    if today_trades.empty:
-        bot.send_message(message.chat.id, f"📊 No trades yet for {today_str}.")
-        return
+        if today_trades.empty:
+            bot.send_message(message.chat.id, f"📊 No trades yet for {today_str}.")
+            return
 
-    wins = (today_trades["pnl"] > 0).sum()
-    losses = (today_trades["pnl"] < 0).sum()
-    pnl_sum = today_trades["pnl"].sum() * 100
+        wins = (today_trades["pnl"] > 0).sum()
+        losses = (today_trades["pnl"] < 0).sum()
+        pnl_sum = today_trades["pnl"].sum() * 100
 
-    bot.send_message(
-        message.chat.id,
-        f"📊 Summary for {today_str}:\n"
-        f"✅ Wins: {wins}\n"
-        f"❌ Losses: {losses}\n"
-        f"📈 Total PnL: {pnl_sum:.2f}%",
-    )
+        bot.send_message(
+            message.chat.id,
+            f"📊 Summary for {today_str}:\n"
+            f"✅ Wins: {wins}\n"
+            f"❌ Losses: {losses}\n"
+            f"📈 Total PnL: {pnl_sum:.2f}%",
+        )
+    except Exception as e:
+        bot.send_message(message.chat.id, f"⚠️ Summary error: {e}")
+
 
 @bot.message_handler(commands=['journalstats'])
 def handle_journal_stats(message):
