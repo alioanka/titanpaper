@@ -12,6 +12,17 @@ def log_ml_features(trade, trend, volatility, atr):
         "tp1", "tp2", "tp3", "atr", "trend_strength", 
         "volatility", "exit_price", "exit_reason", "pnl_pct"
     ]
+    try:
+        pnl_pct = round(float(calc_fake_pnl(trade)), 5)
+    except Exception as e:
+        print(f"⚠️ ML log PnL error: {e} | trade={trade}")
+        pnl_pct = 0.0
+
+    tp_list = trade.get("tp", [])
+    tp1 = tp_list[0] if len(tp_list) > 0 else ""
+    tp2 = tp_list[1] if len(tp_list) > 1 else ""
+    tp3 = tp_list[2] if len(tp_list) > 2 else ""
+
 
     row = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -19,15 +30,15 @@ def log_ml_features(trade, trend, volatility, atr):
         "side": trade["side"],
         "entry_price": trade["entry_price"],
         "sl": trade["sl"],
-        "tp1": trade["tp"][0],
-        "tp2": trade["tp"][1],
-        "tp3": trade["tp"][2],
+        "tp1": tp1,
+        "tp2": tp2,
+        "tp3": tp3,
         "atr": round(atr, 5),
         "trend_strength": round(trend, 5),
         "volatility": round(volatility, 5),
         "exit_price": trade.get("exit_price", ""),
         "exit_reason": trade.get("exit_reason", ""),
-        "pnl_pct": round(calc_fake_pnl(trade), 5)
+        "pnl_pct": pnl_pct
     }
 
     file_exists = os.path.isfile(ML_LOG_FILE)

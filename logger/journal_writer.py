@@ -18,6 +18,12 @@ def update_journal(trade):
     entry_time = trade.get("entry_time", now)
     duration = int(now - entry_time)
     trade["pnl"] = calc_fake_pnl(trade)  # <-- 🔧 Force accurate PnL
+    try:
+        pnl = round(float(trade.get("pnl", 0.0)), 6)
+    except Exception as e:
+        print(f"⚠️ PnL formatting error: {e} | raw value: {trade.get('pnl')}")
+        pnl = 0.0
+
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
         trade.get("trade_id"),
@@ -28,7 +34,7 @@ def update_journal(trade):
         trade.get("status"),
         trade.get("exit_reason"),
         ",".join([f"TP{i+1}" for i in trade.get("hit", [])]) if trade.get("hit") else "",
-        round(trade.get("pnl", 0.0), 6),
+        pnl,
         duration,
         load_last_balance(),
         trade.get("strategy", "unknown")

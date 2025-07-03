@@ -31,6 +31,14 @@ def log_exit(trade):
         "timestamp", "trade_id", "symbol", "side", "exit_price",
         "status", "exit_reason", "tp_hits", "pnl", "strategy"
     ]
+
+    try:
+        pnl = round(float(trade.get("pnl", 0.0)), 6)
+    except Exception as e:
+        print(f"⚠️ PnL formatting error in trade_logger: {e} | value: {trade.get('pnl')}")
+        pnl = 0.0
+
+
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
         trade.get("trade_id"),
@@ -40,7 +48,7 @@ def log_exit(trade):
         trade.get("status"),
         trade.get("exit_reason"),
         ",".join([f"TP{i+1}" for i in trade.get("hit", [])]) if trade.get("hit") else "",
-        round(trade.get("pnl", 0.0), 6),
+        pnl,
         trade.get("strategy", "unknown")
     ]
 
