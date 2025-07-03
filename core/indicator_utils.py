@@ -36,7 +36,7 @@ def fetch_recent_candles(symbol, interval="1m", limit=20):
 
 def calculate_atr(df, period=14):
 
-    if len(df) < period:
+    if df is None or len(df) < period:
         print("⚠️ Not enough data to calculate ATR.")
         return 0.0
     """
