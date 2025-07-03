@@ -89,7 +89,7 @@ def update_position_status(trade, candle):
         trade["exit_reason"] = "SL"
         trade["closed_time"] = time.time()
         update_journal(trade)
-        update_balance(trade)
+   #     update_balance(trade)
         return trade
 
     # ✅ Protect against malformed TP lists
