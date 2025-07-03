@@ -30,5 +30,6 @@ def generate_signal(symbol, candle):
         "symbol": symbol,
         "direction": direction,
         "confidence": abs(trend_strength),
-        "candle": candle  # pass for position modeling
+        "candle": candle,
+        "strategy_name": "basic_trend"
     }

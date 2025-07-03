@@ -34,14 +34,19 @@ def run_bot():
         for symbol in SYMBOLS:
             try:
                 candle = get_latest_candle(symbol, TIMEFRAME)
-                print(f"🧠 {symbol} Candle fetched: O={candle['open']} C={candle['close']} H={candle['high']} L={candle['low']}")
-
-                if not candle:
-                    print(f"⚠️ Skipping {symbol}: no candle data")
+                
+                if not candle or "open" not in candle:
+                    print(f"⚠️ Skipping {symbol}: no valid candle data")
                     continue
+
+                print(f"🧠 {symbol} Candle fetched: O={candle['open']} C={candle['close']} H={candle['high']} L={candle['low']}")
 
                 # Step 1: Check existing trades (close if needed)
                 open_trades, just_closed = check_open_trades(open_trades, candle)
+
+                if not isinstance(open_trades, list):
+                    print("🚨 open_trades corrupted, resetting.")
+                    open_trades = []                
 
                 # Register cooldown for closed symbols
                 now = time.time()
@@ -58,7 +63,7 @@ def run_bot():
                 # Step 3: If no open trade, maybe open one
                 is_open = any(t['symbol'] == symbol and t['status'] == 'open' for t in open_trades)
                 cooldown_expiry = symbol_cooldowns.get(symbol)
-                now = time.time()
+#                now = time.time()
                 if cooldown_expiry and now < cooldown_expiry:
                     print(f"⏳ {symbol} still in cooldown — skipping new entry.")
                     continue

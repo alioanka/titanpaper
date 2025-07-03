@@ -3,6 +3,8 @@
 import time
 import uuid
 from config import TP_MULTIPLIERS, SL_MULTIPLIER, TRAILING_START_AFTER_TP, TRAILING_GAP_ATR
+from logger.journal_writer import update_journal
+from logger.balance_tracker import update_balance
 
 def build_fake_trade(signal, candle, atr):
     entry = candle["close"]
@@ -10,8 +12,8 @@ def build_fake_trade(signal, candle, atr):
     is_long = side == "LONG"
 
     # Updated multipliers
-    TP_MULTIPLIERS = [2.0, 3.0, 4.5]
-    SL_MULTIPLIER = 2.5
+#    TP_MULTIPLIERS = [2.0, 3.0, 4.5]
+#    SL_MULTIPLIER = 2.5
     MIN_SPREAD_PCT = 0.002  # 0.2%
 
     # Calculate initial SL and TP levels based on ATR
@@ -73,6 +75,9 @@ def update_position_status(trade, candle):
         trade["exit_price"] = trade["sl"]
         trade["status"] = "closed"
         trade["exit_reason"] = "SL"
+        trade["closed_time"] = time.time()
+        update_journal(trade)
+        update_balance(trade)
         return trade
 
     # === TP Hits
@@ -89,6 +94,7 @@ def update_position_status(trade, candle):
                 trade["exit_price"] = tp
                 trade["status"] = "closed"
                 trade["exit_reason"] = f"TP{i+1}"
+                trade["closed_time"] = time.time()
                 return trade
 
             if i >= TRAILING_START_AFTER_TP:
@@ -112,6 +118,7 @@ def update_position_status(trade, candle):
             trade["exit_price"] = trail["sl"]
             trade["status"] = "closed"
             trade["exit_reason"] = "TrailingSL"
+            trade["closed_time"] = time.time()
             return trade
 
     return trade

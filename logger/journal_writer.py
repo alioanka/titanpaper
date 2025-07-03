@@ -5,6 +5,8 @@ import os
 import time
 from config import JOURNAL_PATH
 from logger.balance_tracker import load_last_balance
+from utils.pnl_utils import calc_fake_pnl
+
 
 def update_journal(trade):
     fields = [
@@ -15,7 +17,7 @@ def update_journal(trade):
     now = time.time()
     entry_time = trade.get("entry_time", now)
     duration = int(now - entry_time)
-
+    trade["pnl"] = calc_fake_pnl(trade)  # <-- 🔧 Force accurate PnL
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
         trade.get("trade_id"),
@@ -34,20 +36,6 @@ def update_journal(trade):
 
     write_csv_row(JOURNAL_PATH, fields, row)
 
-def calc_fake_pnl(trade):
-    """ Return fake %PnL based on entry and exit """
-    entry = trade.get("entry_price")
-    exit_ = trade.get("exit_price")
-    side = trade.get("side")
-
-    if not entry or not exit_:
-        return 0.0
-
-    if side == "LONG":
-        return (exit_ - entry) / entry
-    elif side == "SHORT":
-        return (entry - exit_) / entry
-    return 0.0
 
 def write_csv_row(path, fields, row):
     file_exists = os.path.isfile(path)

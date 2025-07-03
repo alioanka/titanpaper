@@ -69,31 +69,43 @@ def journal(message):
         else:
             bot.send_message(message.chat.id, "No journal entries yet.")
 
-@bot.message_handler(commands=['summary'])
+@bot.message_handler(commands=["summary"])
 def summary(message):
-    if not os.path.exists(JOURNAL_PATH):
-        bot.send_message(message.chat.id, "No journal data to summarize.")
+    from datetime import datetime
+    import pandas as pd
+    import os
+
+    journal_path = "logs/journal.csv"  # update path if needed
+    if not os.path.exists(journal_path):
+        bot.send_message(message.chat.id, "📄 No journal file found.")
         return
 
-    today = time.strftime("%Y-%m-%d")
-    wins, losses, pnl_sum = 0, 0, 0.0
+    df = pd.read_csv(journal_path)
 
-    with open(JOURNAL_PATH, "r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if "timestamp" in row and row["timestamp"].startswith(today):
+    if "timestamp" not in df.columns or "pnl" not in df.columns:
+        bot.send_message(message.chat.id, "❌ Journal file missing required fields.")
+        return
 
-                try:
-                    pnl = float(row["pnl"])
-                    pnl_sum += pnl
-                    if pnl > 0:
-                        wins += 1
-                    elif pnl < 0:
-                        losses += 1
-                except:
-                    continue
+    # Filter today's trades
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    df["date"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m-%d")
+    today_trades = df[df["date"] == today_str]
 
-    bot.send_message(message.chat.id, f"📊 Today’s Summary ({today}):\nWins: {wins}\nLosses: {losses}\nTotal PnL: {pnl_sum*100:.2f}%")
+    if today_trades.empty:
+        bot.send_message(message.chat.id, f"📊 No trades yet for {today_str}.")
+        return
+
+    wins = (today_trades["pnl"] > 0).sum()
+    losses = (today_trades["pnl"] < 0).sum()
+    pnl_sum = today_trades["pnl"].sum() * 100
+
+    bot.send_message(
+        message.chat.id,
+        f"📊 Summary for {today_str}:\n"
+        f"✅ Wins: {wins}\n"
+        f"❌ Losses: {losses}\n"
+        f"📈 Total PnL: {pnl_sum:.2f}%",
+    )
 
 @bot.message_handler(commands=['journalstats'])
 def handle_journal_stats(message):
