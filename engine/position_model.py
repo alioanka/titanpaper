@@ -72,6 +72,7 @@ def build_fake_trade(signal, candle, atr):
 def update_position_status(trade, candle):
     high = candle["high"]
     low = candle["low"]
+    close = candle["close"]
     side = trade["side"]
     is_long = side == "LONG"
 
@@ -79,8 +80,7 @@ def update_position_status(trade, candle):
         return trade
 
     # === SL Hit
-    sl_hit = (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"])
-    if sl_hit:
+    if (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"]):
         trade["exit_price"] = trade["sl"]
         trade["status"] = "closed"
         trade["exit_reason"] = "SL"
@@ -88,64 +88,56 @@ def update_position_status(trade, candle):
         update_journal(trade)
         return trade
 
-    # ✅ TP list sanity check
-    if "tp" not in trade or not isinstance(trade["tp"], list) or len(trade["tp"]) < 3:
-        print(f"⚠️ Corrupt TP structure in trade: {trade}")
-        trade["status"] = "closed"
-        trade["exit_reason"] = "error"
-        return trade
-
     # === TP Hits
     for i, tp in enumerate(trade["tp"]):
         if i in trade["hit"]:
             continue
 
-        tp_hit = (is_long and high >= tp) or (not is_long and low <= tp)
-        if tp_hit:
+        if (is_long and high >= tp) or (not is_long and low <= tp):
             trade["hit"].append(i)
             print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
 
-            # Simulate realistic exit price
-            if i == 2:  # TP3
-                exit_price = tp
-                exit_reason = "TP3"
-
-                trade["exit_price"] = exit_price
-                trade["status"] = "closed"
-                trade["exit_reason"] = exit_reason
-                trade["closed_time"] = time.time()
-                update_journal(trade)
-                return trade
-
-            # TP1 or TP2 — activate trailing SL and keep trade open
-            if not trade["trailing"]["enabled"]:
+            if i == 0:
                 trade["trailing"]["enabled"] = True
-                print(f"🔁 Trailing SL activated for {trade['symbol']} after TP{i+1}")
+                trade["exit_price"] = tp
+                trade["exit_reason"] = "TP1"
+                trade["status"] = "closed"
+            elif i == 1:
+                trade["trailing"]["enabled"] = True
+                avg = (trade["tp"][0] + trade["tp"][1]) / 2
+                trade["exit_price"] = avg
+                trade["exit_reason"] = "TP1-2"
+                trade["status"] = "closed"
+            elif i == 2:
+                trade["exit_price"] = tp
+                trade["exit_reason"] = "TP3"
+                trade["status"] = "closed"
+
+            trade["closed_time"] = time.time()
+            update_journal(trade)
+            return trade
 
     # === Trailing SL logic
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
-        current_price = candle["close"]
-
         if not trail["triggered"]:
             trail["triggered"] = True
-            trail["sl"] = current_price - trail["sl_gap"] if is_long else current_price + trail["sl_gap"]
+            trail["sl"] = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
         else:
-            new_sl = current_price - trail["sl_gap"] if is_long else current_price + trail["sl_gap"]
+            new_sl = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
             if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
                 trail["sl"] = new_sl
 
-        # Hit trailing SL
-        trail_hit = (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"])
-        if trail_hit:
+        if (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"]):
             trade["exit_price"] = trail["sl"]
-            trade["status"] = "closed"
             trade["exit_reason"] = "TrailingSL"
+            trade["status"] = "closed"
             trade["closed_time"] = time.time()
             update_journal(trade)
             return trade
 
     return trade
+
 
 
 

@@ -59,6 +59,8 @@ def check_open_trades(open_trades, current_candle):
             pnl_pct = calc_fake_pnl(updated)
             new_balance = last_balance * (1 + pnl_pct)
             update_balance(new_balance)
+            print(f"🧠 Logging ML trade: {updated['symbol']} | Reason: {updated['exit_reason']} | PnL: {pnl_pct:+.5f}")
+
             log_ml_features(updated, updated.get("trend_strength", 0), updated.get("volatility", 0), updated.get("atr", 0))
 
 

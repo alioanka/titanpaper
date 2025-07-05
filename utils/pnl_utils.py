@@ -1,26 +1,30 @@
-# File: utils/pnl_utils.py
-
+# utils/pnl_utils.py
 def calc_fake_pnl(trade):
-    """Return realistic %PnL based on entry/exit and direction"""
     try:
-        entry = float(trade.get("entry_price", 0))
-        exit_ = float(trade.get("exit_price", 0))
-        side = trade.get("side", "").upper()
-
-        if entry <= 0 or exit_ <= 0 or side not in ["LONG", "SHORT"]:
-            raise ValueError("Invalid entry/exit/side")
-
-        # Raw return
-        pnl = (exit_ - entry) / entry if side == "LONG" else (entry - exit_) / entry
-
-        # Optional: cap extreme spikes
-        if abs(pnl) > 0.10:
-            print(f"⚠️ Unrealistic PnL ({pnl:.2%}) for trade: {trade}")
+        entry = float(trade["entry_price"])
+        exit_price = float(trade.get("exit_price", 0))
+        side = trade.get("side")
+        reason = trade.get("exit_reason", "")
+        if not entry or not exit_price:
             return 0.0
 
-        return round(pnl, 6)
+        change = (exit_price - entry) / entry
+        pnl = change if side == "LONG" else -change
+
+        # Simulated scaling — you can calibrate these
+        if reason == "TP1":
+            return round(pnl * 0.25, 5)
+        elif reason == "TP1-2":
+            return round(pnl * 0.5, 5)
+        elif reason == "TP3":
+            return round(pnl, 5)
+        elif reason == "TrailingSL":
+            return round(pnl * 0.75, 5)
+        elif reason == "SL":
+            return round(pnl, 5)
+        else:
+            return round(pnl, 5)
 
     except Exception as e:
-        print(f"[PnL Error] {e} | trade: {trade}")
+        print(f"⚠️ calc_fake_pnl() error: {e} | trade={trade}")
         return 0.0
-
