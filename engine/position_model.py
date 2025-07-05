@@ -81,7 +81,7 @@ def update_position_status(trade, candle):
     if trade["status"] != "open":
         return trade
 
-    # === SL Hit (directional wick logic)
+    # === SL Hit
     sl_hit = (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"])
     if sl_hit:
         trade["exit_price"] = trade["sl"]
@@ -89,16 +89,14 @@ def update_position_status(trade, candle):
         trade["exit_reason"] = "SL"
         trade["closed_time"] = time.time()
         update_journal(trade)
-   #     update_balance(trade)
         return trade
 
-    # ✅ Protect against malformed TP lists
+    # ✅ TP list sanity check
     if "tp" not in trade or not isinstance(trade["tp"], list) or len(trade["tp"]) < 3:
         print(f"⚠️ Corrupt TP structure in trade: {trade}")
         trade["status"] = "closed"
         trade["exit_reason"] = "error"
         return trade
-
 
     # === TP Hits
     for i, tp in enumerate(trade["tp"]):
@@ -110,13 +108,27 @@ def update_position_status(trade, candle):
             trade["hit"].append(i)
             print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
 
-            if i == len(trade["tp"]) - 1:
-                trade["exit_price"] = tp
-                trade["status"] = "closed"
-                trade["exit_reason"] = f"TP{i+1}"
-                trade["closed_time"] = time.time()
-                return trade
+            # Simulate realistic partial PnL outcomes
+            if i == 2:  # TP3
+                exit_price = trade["tp"][2]
+                exit_reason = "TP3"
+            elif i == 1:  # TP1–2 average
+                exit_price = (trade["tp"][0] + trade["tp"][1]) / 2
+                exit_reason = "TP1-2"
+            elif i == 0:  # TP1 only
+                exit_price = trade["tp"][0]
+                exit_reason = "TP1"
+            else:
+                continue
 
+            trade["exit_price"] = exit_price
+            trade["status"] = "closed"
+            trade["exit_reason"] = exit_reason
+            trade["closed_time"] = time.time()
+            update_journal(trade)
+            return trade
+
+            # Optional: enable trailing SL only after TP1 or TP2
             if i >= TRAILING_START_AFTER_TP:
                 trade["trailing"]["enabled"] = True
 
@@ -139,8 +151,10 @@ def update_position_status(trade, candle):
             trade["status"] = "closed"
             trade["exit_reason"] = "TrailingSL"
             trade["closed_time"] = time.time()
+            update_journal(trade)
             return trade
 
     return trade
+
 
 
