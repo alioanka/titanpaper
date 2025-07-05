@@ -5,7 +5,8 @@ import os
 import time
 from config import JOURNAL_PATH
 from logger.balance_tracker import load_last_balance
-from utils.pnl_utils import calc_fake_pnl
+from utils.pnl_utils import calc_realistic_pnl
+
 
 
 def update_journal(trade):
@@ -17,7 +18,12 @@ def update_journal(trade):
     now = time.time()
     entry_time = trade.get("entry_time", now)
     duration = int(now - entry_time)
-    trade["pnl"] = calc_fake_pnl(trade)  # <-- 🔧 Force accurate PnL
+    trade["pnl"] = calc_realistic_pnl(
+        trade.get("entry_price"),
+        trade.get("exit_price"),
+        trade.get("side"),
+        trade.get("leverage", 1)
+    )
     try:
         pnl = round(float(trade.get("pnl", 0.0)), 6)
     except Exception as e:

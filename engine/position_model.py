@@ -79,8 +79,16 @@ def update_position_status(trade, candle):
     if trade["status"] != "open":
         return trade
 
-    # === SL Hit
-    if (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"]):
+    if "tp" not in trade or not isinstance(trade["tp"], list) or len(trade["tp"]) < 3:
+        print(f"⚠️ Invalid TP structure: {trade}")
+        trade["status"] = "closed"
+        trade["exit_reason"] = "error"
+        update_journal(trade)
+        return trade
+
+    # === SL HIT
+    sl_hit = (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"])
+    if sl_hit:
         trade["exit_price"] = trade["sl"]
         trade["status"] = "closed"
         trade["exit_reason"] = "SL"
@@ -93,50 +101,58 @@ def update_position_status(trade, candle):
         if i in trade["hit"]:
             continue
 
-        if (is_long and high >= tp) or (not is_long and low <= tp):
+        tp_hit = (is_long and high >= tp) or (not is_long and low <= tp)
+        if tp_hit:
             trade["hit"].append(i)
             print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
 
-            if i == 0:
-                trade["trailing"]["enabled"] = True
+            # TP3 closes the trade
+            if i == 2:
                 trade["exit_price"] = tp
-                trade["exit_reason"] = "TP1"
                 trade["status"] = "closed"
-            elif i == 1:
-                trade["trailing"]["enabled"] = True
-                avg = (trade["tp"][0] + trade["tp"][1]) / 2
-                trade["exit_price"] = avg
-                trade["exit_reason"] = "TP1-2"
-                trade["status"] = "closed"
-            elif i == 2:
-                trade["exit_price"] = tp
                 trade["exit_reason"] = "TP3"
-                trade["status"] = "closed"
+                trade["closed_time"] = time.time()
+                update_journal(trade)
+                return trade
 
-            trade["closed_time"] = time.time()
+            # Enable trailing SL after any TP
+            if not trade["trailing"]["enabled"]:
+                trade["trailing"]["enabled"] = True
+                print(f"🔁 Trailing SL activated for {trade['symbol']} after TP{i+1}")
+
+            # Log journal and ML on TP1/TP2
             update_journal(trade)
-            return trade
+            from utils.ml_logger import log_ml_features
+            log_ml_features(trade, trade.get("trend_strength", 0), trade.get("volatility", 0), trade.get("atr", 0))
+            return trade  # stay open
 
-    # === Trailing SL logic
+    # === Trailing SL Logic
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
+
         if not trail["triggered"]:
             trail["triggered"] = True
             trail["sl"] = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
-        else:
-            new_sl = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
-            if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
-                trail["sl"] = new_sl
+            print(f"🟢 Trailing SL initialized for {trade['symbol']} @ {trail['sl']:.4f}")
 
-        if (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"]):
+        new_sl = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
+        if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
+            trail["sl"] = new_sl
+            print(f"🔄 Trailing SL moved to {trail['sl']:.4f} for {trade['symbol']}")
+
+        trailing_hit = (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"])
+        if trailing_hit:
             trade["exit_price"] = trail["sl"]
-            trade["exit_reason"] = "TrailingSL"
             trade["status"] = "closed"
+            trade["exit_reason"] = "TrailingSL"
             trade["closed_time"] = time.time()
+            print(f"📌 Trailing SL hit for {trade['symbol']} @ {trail['sl']:.4f}")
             update_journal(trade)
             return trade
 
     return trade
+
+
 
 
 

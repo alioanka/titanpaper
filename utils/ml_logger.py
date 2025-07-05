@@ -1,7 +1,7 @@
 import csv
 import os
 from datetime import datetime
-from utils.pnl_utils import calc_fake_pnl
+from utils.pnl_utils import calc_realistic_pnl
 
 
 ML_LOG_FILE = "ml_log.csv"
@@ -13,7 +13,12 @@ def log_ml_features(trade, trend, volatility, atr):
         "volatility", "exit_price", "exit_reason", "pnl_pct"
     ]
     try:
-        pnl_pct = round(float(calc_fake_pnl(trade)), 5)
+        pnl_pct = calc_realistic_pnl(
+            trade.get("entry_price"),
+            trade.get("exit_price"),
+            trade.get("side"),
+            trade.get("leverage", 1)
+        )
     except Exception as e:
         print(f"⚠️ ML log PnL error: {e} | trade={trade}")
         pnl_pct = 0.0
@@ -50,3 +55,20 @@ def log_ml_features(trade, trend, volatility, atr):
 
 # You can import and reuse this anywhere:
 # log_ml_features(trade, trend, volatility, atr)
+
+def log_ml_trade(trade):
+    symbol = trade["symbol"]
+    side = trade["side"]
+    entry = trade["entry_price"]
+    exit_price = trade.get("exit_price", "")
+    reason = trade.get("exit_reason", "")
+    strategy = trade.get("strategy", "unknown")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    pnl = calc_realistic_pnl(trade)
+    pnl_str = f"{pnl:+.5f}"
+
+    print(f"🧠 Logging ML trade: {symbol} | Reason: {reason} | PnL: {pnl_str}")
+
+    with open("ml_log.csv", "a") as f:
+        f.write(f"{timestamp},{symbol},{side},{entry},{exit_price},{reason},{pnl},{strategy}\n")
