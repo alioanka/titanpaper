@@ -16,20 +16,17 @@ def build_fake_trade(signal, candle, atr):
         print(f"⚠️ Invalid ATR or entry for {signal['symbol']} — skipping trade")
         return None
 
-
-    # Updated multipliers
-#    TP_MULTIPLIERS = [2.0, 3.0, 4.5]
-#    SL_MULTIPLIER = 2.5
+    # === Parameters
     MIN_SPREAD_PCT = 0.002  # 0.2%
 
-    # Calculate initial SL and TP levels based on ATR
+    # SL and TP Levels
     sl = entry - atr * SL_MULTIPLIER if is_long else entry + atr * SL_MULTIPLIER
     tp_levels = [
         entry + atr * mult if is_long else entry - atr * mult
         for mult in TP_MULTIPLIERS
     ]
 
-    # === Minimum spread enforcement (Optional Safety Enhancement)
+    # === Enforce minimum TP1 spread (in case of flat ATR)
     min_tp_distance = entry * MIN_SPREAD_PCT
     actual_tp1_distance = abs(tp_levels[0] - entry)
 
@@ -44,7 +41,6 @@ def build_fake_trade(signal, candle, atr):
     if not isinstance(sl, (int, float)) or any(not isinstance(tp, (int, float)) for tp in tp_levels):
         print(f"⚠️ Invalid SL/TP setup for {signal['symbol']}")
         return None
-
 
     return {
         "trade_id": str(uuid.uuid4())[:8],
@@ -63,10 +59,11 @@ def build_fake_trade(signal, candle, atr):
         "status": "open",
         "hit": [],
         "pnl": 0.0,
-        "exit_reason": None,
+        "exit_reason": "",  # ✅ changed from None for consistency
         "trend_strength": signal.get("trend_strength", 0),
         "volatility": signal.get("volatility", 0),
-        "atr": atr
+        "atr": atr,
+        "strategy": signal.get("strategy", "unknown")
     }
 
 
@@ -108,31 +105,24 @@ def update_position_status(trade, candle):
             trade["hit"].append(i)
             print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
 
-            # Simulate realistic partial PnL outcomes
+            # Simulate realistic exit price
             if i == 2:  # TP3
-                exit_price = trade["tp"][2]
+                exit_price = tp
                 exit_reason = "TP3"
-            elif i == 1:  # TP1–2 average
-                exit_price = (trade["tp"][0] + trade["tp"][1]) / 2
-                exit_reason = "TP1-2"
-            elif i == 0:  # TP1 only
-                exit_price = trade["tp"][0]
-                exit_reason = "TP1"
-            else:
-                continue
 
-            trade["exit_price"] = exit_price
-            trade["status"] = "closed"
-            trade["exit_reason"] = exit_reason
-            trade["closed_time"] = time.time()
-            update_journal(trade)
-            return trade
+                trade["exit_price"] = exit_price
+                trade["status"] = "closed"
+                trade["exit_reason"] = exit_reason
+                trade["closed_time"] = time.time()
+                update_journal(trade)
+                return trade
 
-            # Optional: enable trailing SL only after TP1 or TP2
-            if i >= TRAILING_START_AFTER_TP:
+            # TP1 or TP2 — activate trailing SL and keep trade open
+            if not trade["trailing"]["enabled"]:
                 trade["trailing"]["enabled"] = True
+                print(f"🔁 Trailing SL activated for {trade['symbol']} after TP{i+1}")
 
-    # === Trailing SL
+    # === Trailing SL logic
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
         current_price = candle["close"]
@@ -145,8 +135,9 @@ def update_position_status(trade, candle):
             if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
                 trail["sl"] = new_sl
 
-        # Trailing SL hit?
-        if (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"]):
+        # Hit trailing SL
+        trail_hit = (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"])
+        if trail_hit:
             trade["exit_price"] = trail["sl"]
             trade["status"] = "closed"
             trade["exit_reason"] = "TrailingSL"
@@ -155,6 +146,7 @@ def update_position_status(trade, candle):
             return trade
 
     return trade
+
 
 
 
