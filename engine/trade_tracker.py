@@ -50,7 +50,7 @@ def check_open_trades(open_trades, current_candle):
         if num_hits > 0 and "partial_credit" not in updated and updated["status"] == "open":
             partial_pct = 0.33 * num_hits  # TP1 = +33%, TP1+TP2 = +66%
             updated["partial_credit"] = True  # prevent re-crediting
-            from utils.pnl_utils import calc_realistic_pnl
+            
             pnl_pct = calc_realistic_pnl(
                 updated.get("entry_price"),
                 updated["tp"][updated["hit"][-1]],
