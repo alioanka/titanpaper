@@ -1,74 +1,66 @@
+# ml_logger.py
+
 import csv
 import os
 from datetime import datetime
 from utils.pnl_utils import calc_realistic_pnl
 
-
 ML_LOG_FILE = "ml_log.csv"
 
 def log_ml_features(trade, trend, volatility, atr):
-    headers = [
-        "timestamp", "symbol", "side", "entry_price", "sl", 
-        "tp1", "tp2", "tp3", "atr", "trend_strength", 
-        "volatility", "exit_price", "exit_reason", "pnl_pct"
-    ]
+    if trade.get("status") != "closed":
+        return
+
     try:
-        pnl_pct = calc_realistic_pnl(
-            trade.get("entry_price"),
-            trade.get("exit_price"),
-            trade.get("side"),
-            trade.get("leverage", 1)
-        )
+        entry_price = float(trade.get("entry_price"))
+        exit_price = float(trade.get("exit_price"))
+        side = trade.get("side", "").upper()
+        leverage = float(trade.get("leverage", 1))
+
+        # === Realistic PnL
+        pnl_pct = calc_realistic_pnl(entry_price, exit_price, side, leverage)
+
+        # === Raw profit (based on risk model, e.g. $1000 balance with 2% risk)
+        balance_snapshot = trade.get("balance_snapshot", 1000)
+        risk_per_trade = 0.02
+        raw_risk = balance_snapshot * risk_per_trade
+        raw_profit = round(raw_risk * pnl_pct / 100, 4)
+
+        # === Duration
+        duration = round(float(trade.get("closed_time", 0)) - float(trade.get("open_time", 0)), 2)
+
     except Exception as e:
-        print(f"⚠️ ML log PnL error: {e} | trade={trade}")
-        pnl_pct = 0.0
+        print(f"⚠️ ML log calc error: {e}")
+        return
 
-    tp_list = trade.get("tp", [])
-    tp1 = tp_list[0] if len(tp_list) > 0 else ""
-    tp2 = tp_list[1] if len(tp_list) > 1 else ""
-    tp3 = tp_list[2] if len(tp_list) > 2 else ""
-
-
+    tp = trade.get("tp", [])
     row = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "symbol": trade["symbol"],
-        "side": trade["side"],
-        "entry_price": trade["entry_price"],
-        "sl": trade["sl"],
-        "tp1": tp1,
-        "tp2": tp2,
-        "tp3": tp3,
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "id": trade.get("trade_id", ""),
+        "symbol": trade.get("symbol", ""),
+        "side": side,
+        "entry_price": entry_price,
+        "exit_price": exit_price,
+        "exit_reason": trade.get("exit_reason", ""),
+        "sl": trade.get("sl", ""),
+        "tp1": tp[0] if len(tp) > 0 else "",
+        "tp2": tp[1] if len(tp) > 1 else "",
+        "tp3": tp[2] if len(tp) > 2 else "",
         "atr": round(atr, 5),
         "trend_strength": round(trend, 5),
         "volatility": round(volatility, 5),
-        "exit_price": trade.get("exit_price", ""),
-        "exit_reason": trade.get("exit_reason", ""),
-        "pnl_pct": pnl_pct
+        "pnl_pct": pnl_pct,
+        "raw_profit": raw_profit,
+        "duration_sec": duration,
+        "strategy": trade.get("strategy", ""),
+        "leverage": leverage
     }
 
+    headers = list(row.keys())
     file_exists = os.path.isfile(ML_LOG_FILE)
-    with open(ML_LOG_FILE, mode="a", newline="") as f:
+
+    with open(ML_LOG_FILE, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=headers)
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
-
-# You can import and reuse this anywhere:
-# log_ml_features(trade, trend, volatility, atr)
-
-def log_ml_trade(trade):
-    symbol = trade["symbol"]
-    side = trade["side"]
-    entry = trade["entry_price"]
-    exit_price = trade.get("exit_price", "")
-    reason = trade.get("exit_reason", "")
-    strategy = trade.get("strategy", "unknown")
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    pnl = calc_realistic_pnl(trade)
-    pnl_str = f"{pnl:+.5f}"
-
-    print(f"🧠 Logging ML trade: {symbol} | Reason: {reason} | PnL: {pnl_str}")
-
-    with open("ml_log.csv", "a") as f:
-        f.write(f"{timestamp},{symbol},{side},{entry},{exit_price},{reason},{pnl},{strategy}\n")

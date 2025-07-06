@@ -11,7 +11,6 @@ def build_fake_trade(signal, candle, atr):
     side = signal["direction"]
     is_long = side == "LONG"
 
-    # ✅ Sanity check
     if atr is None or atr <= 0 or not isinstance(entry, (int, float)):
         print(f"⚠️ Invalid ATR or entry for {signal['symbol']} — skipping trade")
         return None
@@ -26,7 +25,7 @@ def build_fake_trade(signal, candle, atr):
         for mult in TP_MULTIPLIERS
     ]
 
-    # === Enforce minimum TP1 spread (in case of flat ATR)
+    # === Enforce minimum TP1 spread (in case ATR is very low)
     min_tp_distance = entry * MIN_SPREAD_PCT
     actual_tp1_distance = abs(tp_levels[0] - entry)
 
@@ -37,7 +36,6 @@ def build_fake_trade(signal, candle, atr):
 
     print(f"📊 {signal['symbol']} trade setup → SL: {sl:.2f}, TP1: {tp_levels[0]:.2f}, TP2: {tp_levels[1]:.2f}, TP3: {tp_levels[2]:.2f}")
 
-    # ✅ SL/TP validation
     if not isinstance(sl, (int, float)) or any(not isinstance(tp, (int, float)) for tp in tp_levels):
         print(f"⚠️ Invalid SL/TP setup for {signal['symbol']}")
         return None
@@ -60,12 +58,13 @@ def build_fake_trade(signal, candle, atr):
         "status": "open",
         "hit": [],
         "pnl": 0.0,
-        "exit_reason": "",  # ✅ changed from None for consistency
+        "exit_reason": "",
         "trend_strength": signal.get("trend_strength", 0),
         "volatility": signal.get("volatility", 0),
         "atr": atr,
         "strategy": signal.get("strategy", "unknown")
     }
+
 
 
 
