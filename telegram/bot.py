@@ -142,7 +142,8 @@ def handle_journal_stats(message):
 
         if "TP3" in reason:
             symbol_stats[symbol]["tp3"] += 1
-        elif "TP" in reason:
+        elif "TP1" in reason or "TP2" in reason or "TP1–2" in reason:
+
             symbol_stats[symbol]["tp12"] += 1
         elif "SL" in reason:
             symbol_stats[symbol]["sl"] += 1
@@ -202,7 +203,8 @@ def handle_rating(message):
 
         if "TP3" in reason:
             counts["tp3"] += 1
-        elif "TP" in reason:
+        elif "TP1" in reason or "TP2" in reason or "TP1–2" in reason:
+
             counts["partial_tp"] += 1
         elif "SL" in reason:
             counts["sl"] += 1

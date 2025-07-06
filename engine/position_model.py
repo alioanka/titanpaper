@@ -120,6 +120,14 @@ def update_position_status(trade, candle):
                 trade["trailing"]["enabled"] = True
                 print(f"🔁 Trailing SL activated for {trade['symbol']} after TP{i+1}")
 
+            # Log fake exit for ML purposes only
+            fake_trade = trade.copy()
+            fake_trade["exit_price"] = tp
+            fake_trade["exit_reason"] = f"TP{i+1}-Partial"
+            from utils.ml_logger import log_ml_features
+            log_ml_features(fake_trade, trade.get("trend_strength", 0), trade.get("volatility", 0), trade.get("atr", 0))
+
+
             # Log journal and ML on TP1/TP2
             update_journal(trade)
             from utils.ml_logger import log_ml_features
@@ -144,7 +152,8 @@ def update_position_status(trade, candle):
         if trailing_hit:
             trade["exit_price"] = trail["sl"]
             trade["status"] = "closed"
-            trade["exit_reason"] = "TrailingSL"
+            trade["exit_reason"] = "TP1–2" if len(trade.get("hit", [])) in [1, 2] else "TrailingSL"
+
             trade["closed_time"] = time.time()
             print(f"📌 Trailing SL hit for {trade['symbol']} @ {trail['sl']:.4f}")
             update_journal(trade)
