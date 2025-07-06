@@ -81,7 +81,9 @@ def check_open_trades(open_trades, current_candle):
                 updated.get("side"),
                 updated.get("leverage", 1)
             )
-            new_balance = last_balance * (1 + pnl_pct)
+            risk_amount = last_balance * RISK_PER_TRADE
+            profit_or_loss = risk_amount * pnl_pct / 100  # PnL is % return on that position
+            new_balance = last_balance + profit_or_loss
             update_balance(new_balance)
             print(f"🧠 Logging ML trade: {updated['symbol']} | Reason: {updated['exit_reason']} | PnL: {pnl_pct:+.5f}")
 

@@ -26,6 +26,8 @@ SL_MULTIPLIER = 2.5
 MIN_SPREAD_PCT = 0.002  # 0.2%
 TRAILING_START_AFTER_TP = 1  # After TP1, activate trailing
 TRAILING_GAP_ATR = 0.5
+RISK_PER_TRADE = 0.02  # 2% of total balance per trade
+
 
 ### === LOGGING === ###
 TRADE_LOG_PATH = "logs/trade_log.csv"

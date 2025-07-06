@@ -48,6 +48,7 @@ def build_fake_trade(signal, candle, atr):
         "side": side,
         "entry_time": time.time(),
         "entry_price": entry,
+        "leverage": 1,
         "sl": sl,
         "tp": tp_levels,
         "trailing": {
