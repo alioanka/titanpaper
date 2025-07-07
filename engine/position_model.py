@@ -143,10 +143,16 @@ def update_position_status(trade, candle):
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
 
-        if not trail["triggered"]:
-            trail["triggered"] = True
-            trail["sl"] = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
-            print(f"🟢 Trailing SL initialized for {trade['symbol']} @ {trail['sl']:.4f}")
+    if not trail["triggered"]:
+        # Wait at least 1 full candle after TP1 to activate trailing SL
+        entry_time = trade.get("entry_time", 0)
+        if time.time() - entry_time < 60:  # 🕒 You can change this to 60, 90, or more seconds
+            print(f"⏳ Trailing SL delayed for {trade['symbol']} — too soon after TP1")
+            return trade
+        trail["triggered"] = True
+        trail["sl"] = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
+        print(f"🟢 Trailing SL initialized for {trade['symbol']} @ {trail['sl']:.4f}")
+
 
         new_sl = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
         if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):

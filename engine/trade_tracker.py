@@ -46,6 +46,18 @@ def check_open_trades(open_trades, current_candle):
     for trade in open_trades:
         updated = update_position_status(trade, current_candle)
 
+        if updated["exit_reason"] == "TP1–2":
+            pnl_check = calc_realistic_pnl(
+                updated.get("entry_price"),
+                updated.get("exit_price"),
+                updated.get("side"),
+                updated.get("leverage", 1)
+            )
+            if pnl_check < 0.1:
+                print(f"⚠️ Skipping ML log for TP1–2 with tiny PnL: {pnl_check:.5f}%")
+                continue
+
+
         # ✅ Partial TP balance logic
         num_hits = len(updated.get("hit", []))
         if num_hits > 0 and "partial_credit" not in updated and updated["status"] != "closed":
