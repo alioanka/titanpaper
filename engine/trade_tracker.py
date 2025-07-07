@@ -8,7 +8,8 @@ from logger.journal_writer import update_journal
 from logger.balance_tracker import load_last_balance, update_balance
 from utils.pnl_utils import calc_realistic_pnl
 
-def maybe_open_new_trade(signal, candle, open_trades):
+def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
+
     """
     If signal exists and symbol is not already open, simulate a fake trade.
     """
@@ -24,7 +25,10 @@ def maybe_open_new_trade(signal, candle, open_trades):
     print(f"📐 {symbol} ATR: {atr:.5f}")
 
     if not atr or atr == 0:
-        return None
+        atr = fallback_atr
+        print(f"⚠️ Using fallback ATR for {symbol}: {atr:.5f}")
+        if not atr or atr == 0:
+            return None
 
     trade = build_fake_trade(signal, candle, atr)
 

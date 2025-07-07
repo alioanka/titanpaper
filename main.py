@@ -1,32 +1,61 @@
-
 # main.py
 
 import time
 import uuid
+import pandas as pd
 from config import *
+from dotenv import load_dotenv
+import os
+from binance.client import Client
 from data.price_feed import get_latest_candle
 from core.signal_engine import generate_signal
 from engine.trade_tracker import check_open_trades, maybe_open_new_trade
 from logger.trade_logger import log_trade
 from logger.journal_writer import update_journal
+from core.indicator_utils import calculate_atr
 from telegram.bot import run_telegram_polling, send_startup_notice
 from threading import Thread
 
+# Load secrets
+load_dotenv()
+client = Client(api_key=os.getenv("BINANCE_API_KEY"), api_secret=os.getenv("BINANCE_API_SECRET"))
+
 # In-memory store of fake open trades
 open_trades = []
-
-# Cooldown registry to avoid instant re-entry
 recently_closed_symbols = set()
+symbol_atr_cache = {}  # ✅ ATR cache
+
+def get_recent_candles(symbol, interval="5m", limit=100):
+    try:
+        candles = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        df = pd.DataFrame(candles, columns=[
+            "timestamp", "open", "high", "low", "close", "volume",
+            "close_time", "quote_asset_volume", "num_trades",
+            "taker_buy_base", "taker_buy_quote", "ignore"
+        ])
+        df = df[["high", "low", "close"]].astype(float)
+        return df
+    except Exception as e:
+        print(f"❌ Failed to fetch historical candles for {symbol}: {e}")
+        return None
 
 def run_bot():
     global open_trades
-    symbol_cooldowns = {}  # Track cooldown times for each symbol
-    COOLDOWN_SECONDS = 90  # Adjust as needed (e.g., 60–180 seconds)
+    symbol_cooldowns = {}
+    COOLDOWN_SECONDS = 90
 
     print(f"🚀 Starting {BOT_NAME} in {MODE.upper()} mode...")
     print("🔄 Sending Telegram startup notice...")
     send_startup_notice()
     print("✅ Telegram startup notice sent. Starting loop...")
+
+    # ✅ Preload ATR values from Binance
+    print("📦 Preloading ATR from Binance historical candles...")
+    for symbol in SYMBOLS:
+        df = get_recent_candles(symbol, interval=TIMEFRAME, limit=100)
+        atr = calculate_atr(df, period=21) if df is not None else 0.0
+        symbol_atr_cache[symbol] = atr
+        print(f"📐 {symbol} Initial ATR: {atr:.5f}")
 
     while True:
         recently_closed_symbols.clear()
@@ -34,44 +63,40 @@ def run_bot():
         for symbol in SYMBOLS:
             try:
                 candle = get_latest_candle(symbol, TIMEFRAME)
-                
+
                 if not candle or "open" not in candle:
                     print(f"⚠️ Skipping {symbol}: no valid candle data")
                     continue
 
                 print(f"🧠 {symbol} Candle fetched: O={candle['open']} C={candle['close']} H={candle['high']} L={candle['low']}")
 
-                # Step 1: Check existing trades (close if needed)
                 open_trades, just_closed = check_open_trades(open_trades, candle)
 
                 if not isinstance(open_trades, list):
                     print("🚨 open_trades corrupted, resetting.")
-                    open_trades = []                
+                    open_trades = []
 
-                # Register cooldown for closed symbols
                 now = time.time()
                 for sym in just_closed:
                     symbol_cooldowns[sym] = now + COOLDOWN_SECONDS
 
-
-
-                # Step 2: Prevent immediate re-entry into just-closed symbols
                 if symbol in recently_closed_symbols:
                     print(f"⏳ Skipping {symbol} — just closed this symbol")
                     continue
 
-                # Step 3: If no open trade, maybe open one
                 is_open = any(t['symbol'] == symbol and t['status'] == 'open' for t in open_trades)
                 cooldown_expiry = symbol_cooldowns.get(symbol)
-#                now = time.time()
+
                 if cooldown_expiry and now < cooldown_expiry:
                     print(f"⏳ {symbol} still in cooldown — skipping new entry.")
                     continue
+
                 if not is_open:
                     signal = generate_signal(symbol, candle)
                     if signal:
                         print(f"✅ TRADE SIGNAL: {symbol} | Side: {signal['direction']} | Trend: {signal['confidence']:.4f} | Price: {candle['close']}")
-                        trade = maybe_open_new_trade(signal, candle, open_trades)
+                        fallback_atr = symbol_atr_cache.get(symbol, 0.0)
+                        trade = maybe_open_new_trade(signal, candle, open_trades, fallback_atr=fallback_atr)
                         if trade:
                             trade["strategy"] = signal.get("strategy_name", DEFAULT_STRATEGY_NAME)
                             trade["id"] = str(uuid.uuid4())
@@ -85,12 +110,10 @@ def run_bot():
             except Exception as e:
                 print(f"❌ Error for {symbol}: {e}")
 
-        # Capture recently closed symbols this cycle
         recently_closed_symbols.update(
             [t['symbol'] for t in open_trades if t.get('status') == 'closed']
         )
 
-        # Wait before next cycle
         time.sleep(EVALUATION_INTERVAL)
 
 
