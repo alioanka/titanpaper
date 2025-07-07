@@ -23,7 +23,6 @@ client = Client(api_key=os.getenv("BINANCE_API_KEY"), api_secret=os.getenv("BINA
 # In-memory store of fake open trades
 open_trades = []
 recently_closed_symbols = set()
-symbol_atr_cache = {}  # ✅ ATR cache
 
 def get_recent_candles(symbol, interval="5m", limit=100):
     try:
@@ -49,13 +48,7 @@ def run_bot():
     send_startup_notice()
     print("✅ Telegram startup notice sent. Starting loop...")
 
-    # ✅ Preload ATR values from Binance
-    print("📦 Preloading ATR from Binance historical candles...")
-    for symbol in SYMBOLS:
-        df = get_recent_candles(symbol, interval=TIMEFRAME, limit=100)
-        atr = calculate_atr(df, period=21) if df is not None else 0.0
-        symbol_atr_cache[symbol] = atr
-        print(f"📐 {symbol} Initial ATR: {atr:.5f}")
+
 
     while True:
         recently_closed_symbols.clear()

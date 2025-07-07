@@ -46,7 +46,8 @@ def check_open_trades(open_trades, current_candle):
 
         # ✅ Partial TP balance logic
         num_hits = len(updated.get("hit", []))
-        if num_hits > 0 and "partial_credit" not in updated and updated["status"] == "open":
+        if num_hits > 0 and "partial_credit" not in updated and updated["status"] != "closed":
+
             partial_pct = 0.33 * num_hits  # TP1 = 33%, TP1+TP2 = 66%
             updated["partial_credit"] = True
 

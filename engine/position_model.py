@@ -127,14 +127,16 @@ def update_position_status(trade, candle):
             fake_trade = trade.copy()
             fake_trade["exit_price"] = tp
             fake_trade["exit_reason"] = f"TP{i+1}-Partial"
+            fake_trade["status"] = "closed"
+            fake_trade["entry_time"] = trade.get("entry_time")
+            fake_trade["closed_time"] = time.time()
+
             from utils.ml_logger import log_ml_features
             log_ml_features(fake_trade, trade.get("trend_strength", 0), trade.get("volatility", 0), trade.get("atr", 0))
 
 
             # Log journal and ML on TP1/TP2
             update_journal(trade)
-            from utils.ml_logger import log_ml_features
-            log_ml_features(trade, trade.get("trend_strength", 0), trade.get("volatility", 0), trade.get("atr", 0))
             return trade  # stay open
 
     # === Trailing SL Logic

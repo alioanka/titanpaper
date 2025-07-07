@@ -17,17 +17,14 @@ def log_ml_features(trade, trend, volatility, atr):
         side = trade.get("side", "").upper()
         leverage = float(trade.get("leverage", 1))
 
-        # === Realistic PnL
         pnl_pct = calc_realistic_pnl(entry_price, exit_price, side, leverage)
 
-        # === Raw profit (based on risk model, e.g. $1000 balance with 2% risk)
         balance_snapshot = trade.get("balance_snapshot", 1000)
         risk_per_trade = 0.02
         raw_risk = balance_snapshot * risk_per_trade
         raw_profit = round(raw_risk * pnl_pct / 100, 4)
 
-        # === Duration
-        duration = round(float(trade.get("closed_time", 0)) - float(trade.get("open_time", 0)), 2)
+        duration = round(float(trade.get("closed_time", 0)) - float(trade.get("entry_time", 0)), 2)
 
     except Exception as e:
         print(f"⚠️ ML log calc error: {e}")
@@ -53,7 +50,8 @@ def log_ml_features(trade, trend, volatility, atr):
         "raw_profit": raw_profit,
         "duration_sec": duration,
         "strategy": trade.get("strategy", ""),
-        "leverage": leverage
+        "leverage": leverage,
+        "is_partial": 1 if "Partial" in trade.get("exit_reason", "") else 0
     }
 
     headers = list(row.keys())
