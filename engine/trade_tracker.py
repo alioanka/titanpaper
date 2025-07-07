@@ -16,6 +16,8 @@ def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
         return None
 
     df = fetch_recent_candles(symbol)
+    print(f"✅ Successfully fetched {len(df)} candles for {symbol}")
+
     if df is None:
         return None
 

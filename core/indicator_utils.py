@@ -1,36 +1,21 @@
-# core/indicator_utils.py
-
-import requests
+from binance.client import Client
+import os
 import pandas as pd
 
-def fetch_recent_candles(symbol, interval="1m", limit=20):
-    """
-    Fetch recent candles for indicator calculations (e.g. ATR).
-    """
-    url = "https://api.binance.com/api/v3/klines"
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "limit": limit
-    }
+client = Client(api_key=os.getenv("BINANCE_API_KEY"), api_secret=os.getenv("BINANCE_API_SECRET"))
 
+def fetch_recent_candles(symbol, interval="5m", limit=100):
     try:
-        res = requests.get(url, params=params, timeout=5)
-        data = res.json()
-
-        df = pd.DataFrame(data, columns=[
+        klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        df = pd.DataFrame(klines, columns=[
             "timestamp", "open", "high", "low", "close", "volume",
-            "_", "_", "_", "_", "_", "_"
+            "close_time", "quote_asset_volume", "num_trades",
+            "taker_buy_base", "taker_buy_quote", "ignore"
         ])
-        df["open"] = df["open"].astype(float)
-        df["high"] = df["high"].astype(float)
-        df["low"] = df["low"].astype(float)
-        df["close"] = df["close"].astype(float)
-
+        df = df[["high", "low", "close"]].astype(float)
         return df
-
     except Exception as e:
-        print(f"❌ Failed to fetch recent candles for {symbol}: {e}")
+        print(f"❌ Failed to fetch historical candles for {symbol}: {e}")
         return None
 
 
