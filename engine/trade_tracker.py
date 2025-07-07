@@ -7,12 +7,10 @@ from logger.trade_logger import log_exit
 from logger.journal_writer import update_journal
 from logger.balance_tracker import load_last_balance, update_balance
 from utils.pnl_utils import calc_realistic_pnl
+from utils.ml_logger import log_ml_features
+
 
 def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
-
-    """
-    If signal exists and symbol is not already open, simulate a fake trade.
-    """
     symbol = signal["symbol"]
     if any(t["symbol"] == symbol and t["status"] == "open" for t in open_trades):
         return None
@@ -40,9 +38,6 @@ def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
 
 
 def check_open_trades(open_trades, current_candle):
-    """
-    Check open trades for SL/TP/trailing and close/log if needed.
-    """
     still_open = []
     just_closed = []
 
@@ -52,31 +47,27 @@ def check_open_trades(open_trades, current_candle):
         # ✅ Partial TP balance logic
         num_hits = len(updated.get("hit", []))
         if num_hits > 0 and "partial_credit" not in updated and updated["status"] == "open":
-            partial_pct = 0.33 * num_hits  # TP1 = +33%, TP1+TP2 = +66%
-            updated["partial_credit"] = True  # prevent re-crediting
-            
+            partial_pct = 0.33 * num_hits  # TP1 = 33%, TP1+TP2 = 66%
+            updated["partial_credit"] = True
+
             pnl_pct = calc_realistic_pnl(
                 updated.get("entry_price"),
                 updated["tp"][updated["hit"][-1]],
                 updated.get("side"),
                 updated.get("leverage", 1)
             )
+
             last_balance = load_last_balance()
-            gain = last_balance * (pnl_pct * partial_pct)
+            risk_amount = last_balance * RISK_PER_TRADE
+            gain = risk_amount * pnl_pct / 100 * partial_pct
             new_balance = last_balance + gain
+
             update_balance(new_balance)
             print(f"💡 Partial TP balance applied ({partial_pct:.0%}): +{gain:.2f} → {new_balance:.2f}")
 
-
+        # ✅ Final closure
         if updated["status"] == "closed":
-            from utils.ml_logger import log_ml_features
-
             print(f"🚪 {updated['symbol']} closed due to {updated.get('exit_reason')} @ {updated.get('exit_price')}")
-
-            just_closed.append(updated["symbol"])  # ← track closed symbol
-
-            log_exit(updated)
-            update_journal(updated)
 
             last_balance = load_last_balance()
             pnl_pct = calc_realistic_pnl(
@@ -85,18 +76,26 @@ def check_open_trades(open_trades, current_candle):
                 updated.get("side"),
                 updated.get("leverage", 1)
             )
+            updated["pnl"] = pnl_pct  # 🔁 Store for logging
+
             risk_amount = last_balance * RISK_PER_TRADE
-            profit_or_loss = risk_amount * pnl_pct / 100  # PnL is % return on that position
+            profit_or_loss = risk_amount * pnl_pct / 100
             new_balance = last_balance + profit_or_loss
             update_balance(new_balance)
+
             print(f"🧠 Logging ML trade: {updated['symbol']} | Reason: {updated['exit_reason']} | PnL: {pnl_pct:+.5f}")
-
-            log_ml_features(updated, updated.get("trend_strength", 0), updated.get("volatility", 0), updated.get("atr", 0))
-
-
             print(f"💰 Balance updated: {last_balance:.2f} → {new_balance:.2f} ({pnl_pct:+.2f}%)")
+
+            update_journal(updated)
+            log_exit(updated)
+            log_ml_features(
+                updated,
+                updated.get("trend_strength", 0),
+                updated.get("volatility", 0),
+                updated.get("atr", 0),
+            )
+            just_closed.append(updated["symbol"])
         else:
             still_open.append(updated)
 
     return still_open, just_closed
-
