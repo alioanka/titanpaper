@@ -34,21 +34,32 @@ def fetch_recent_candles(symbol, interval="1m", limit=20):
         return None
 
 
-def calculate_atr(df, period=14):
+# core/indicator_utils.py
+
+def calculate_atr(df, period=21):
+    """
+    Calculate the Average True Range (ATR) with smoothing and NaN protection.
+    """
     if df is None or len(df) < period:
         print("⚠️ Not enough candles to calculate ATR.")
         return 0.0
 
-    df["H-L"] = df["high"] - df["low"]
-    df["H-C"] = abs(df["high"] - df["close"].shift())
-    df["L-C"] = abs(df["low"] - df["close"].shift())
-    df["TR"] = df[["H-L", "H-C", "L-C"]].max(axis=1)
-    df["ATR"] = df["TR"].rolling(window=period).mean()
+    try:
+        df = df.copy()  # avoid modifying original
+        df["H-L"] = df["high"] - df["low"]
+        df["H-C"] = abs(df["high"] - df["close"].shift())
+        df["L-C"] = abs(df["low"] - df["close"].shift())
+        df["TR"] = df[["H-L", "H-C", "L-C"]].max(axis=1)
+        df["ATR"] = df["TR"].rolling(window=period).mean()
 
-    atr_val = df["ATR"].iloc[-1]
-    if pd.isna(atr_val):
-        print("⚠️ ATR result is NaN — skipping.")
+        atr_val = df["ATR"].iloc[-1]
+        if pd.isna(atr_val) or atr_val <= 0:
+            print("⚠️ Invalid ATR result — returning 0.0")
+            return 0.0
+
+        return round(atr_val, 5)
+    except Exception as e:
+        print(f"❌ ATR calculation error: {e}")
         return 0.0
 
-    return round(atr_val, 5)
 

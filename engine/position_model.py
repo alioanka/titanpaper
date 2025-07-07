@@ -17,6 +17,9 @@ def build_fake_trade(signal, candle, atr):
 
     # === Parameters
     MIN_SPREAD_PCT = 0.002  # 0.2%
+    min_atr = entry * 0.0015  # 0.15% minimum
+    atr = max(atr, min_atr)
+
 
     # SL and TP Levels
     sl = entry - atr * SL_MULTIPLIER if is_long else entry + atr * SL_MULTIPLIER

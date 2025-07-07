@@ -14,7 +14,7 @@ SYMBOLS = [
 ]
 
 ### === STRATEGY SETTINGS === ###
-TIMEFRAME = "1m"  # Binance supported intervals: 1m, 3m, 5m, 15m, etc.
+TIMEFRAME = "5m"  # Binance supported intervals: 1m, 3m, 5m, 15m, etc.
 MIN_TREND_STRENGTH = 0.0001
 MIN_VOLATILITY = 0.0003  # % per candle
 
