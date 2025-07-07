@@ -88,8 +88,8 @@ def run_bot():
                     signal = generate_signal(symbol, candle)
                     if signal:
                         print(f"✅ TRADE SIGNAL: {symbol} | Side: {signal['direction']} | Trend: {signal['confidence']:.4f} | Price: {candle['close']}")
-                        fallback_atr = symbol_atr_cache.get(symbol, 0.0)
-                        trade = maybe_open_new_trade(signal, candle, open_trades, fallback_atr=fallback_atr)
+                        trade = maybe_open_new_trade(signal, candle, open_trades)
+
                         if trade:
                             trade["strategy"] = signal.get("strategy_name", DEFAULT_STRATEGY_NAME)
                             trade["id"] = str(uuid.uuid4())
