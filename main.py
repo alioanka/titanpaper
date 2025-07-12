@@ -23,6 +23,8 @@ client = Client(api_key=os.getenv("BINANCE_API_KEY"), api_secret=os.getenv("BINA
 # In-memory store of fake open trades
 open_trades = []
 recently_closed_symbols = set()
+symbol_atr_cache = {}
+
 
 def get_recent_candles(symbol, interval="5m", limit=100):
     try:
@@ -88,13 +90,47 @@ def run_bot():
                     signal = generate_signal(symbol, candle)
                     if signal:
                         print(f"✅ TRADE SIGNAL: {symbol} | Side: {signal['direction']} | Trend: {signal['confidence']:.4f} | Price: {candle['close']}")
-                        trade = maybe_open_new_trade(signal, candle, open_trades)
+                        
+                        # === ML integration (NEW) ===
+                        from ml_predictor import predict_trade
+                        from core.indicator_utils import calculate_atr
+
+                        df = get_recent_candles(symbol)
+                        fallback_atr = symbol_atr_cache.get(symbol, 0.0)
+                        atr = calculate_atr(df) if df is not None else fallback_atr
+                        symbol_atr_cache[symbol] = atr  # <-- update cache live per run
+
+                        signal_data = {
+                            'symbol': symbol,
+                            'side': signal['direction'],
+                            'entry_price': candle['close'],
+                            'atr': atr,
+                            'trend_strength': signal['confidence'],
+                            'volatility': candle.get('volatility', 0.002),  # optionally improve from price_feed
+                            'duration_sec': 0
+                        }
+
+                        ml_result = predict_trade(signal_data)
+                        print(f"[ML] Prediction: {ml_result['exit_reason']}, Confidence: {ml_result['confidence']:.2%}, Expected PnL: {ml_result['expected_pnl']:.2f}%")
+
+                        # Decide if we should proceed (soft filter)
+                        if ml_result['exit_reason'] == 'SL' or ml_result['confidence'] < 0.5:
+                            print(f"[ML] Skipping trade due to low confidence or SL prediction.")
+                            continue  # Skip to next symbol
+
+                        # === Proceed to open trade ===
+                        trade = maybe_open_new_trade(signal, candle, open_trades, fallback_atr=fallback_atr)
+
 
                         if trade:
                             trade["strategy"] = signal.get("strategy_name", DEFAULT_STRATEGY_NAME)
                             trade["id"] = str(uuid.uuid4())
+                            trade["ml_exit_reason"] = ml_result['exit_reason']
+                            trade["ml_confidence"] = ml_result['confidence']
+                            trade["ml_expected_pnl"] = ml_result['expected_pnl']
                             open_trades.append(trade)
                             log_trade(trade)
+
                     else:
                         print(f"❌ No valid signal for {symbol}")
                 else:

@@ -8,8 +8,10 @@ from config import TRADE_LOG_PATH
 def log_trade(trade):
     fields = [
         "timestamp", "trade_id", "symbol", "side", "entry_price",
-        "sl", "tp1", "tp2", "tp3", "strategy", "status"
+        "sl", "tp1", "tp2", "tp3", "strategy", "status",
+        "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
     ]
+
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
         trade.get("trade_id"),
@@ -21,15 +23,19 @@ def log_trade(trade):
         trade["tp"][1] if len(trade["tp"]) > 1 else "",
         trade["tp"][2] if len(trade["tp"]) > 2 else "",
         trade.get("strategy", "unknown"),
-        trade.get("status", "open")
-    ]
+        trade.get("status", "open"),
+        trade.get("ml_exit_reason", ""),
+        trade.get("ml_confidence", ""),
+        trade.get("ml_expected_pnl", "")
+        ]
 
     write_csv_row(TRADE_LOG_PATH, fields, row)
 
 def log_exit(trade):
     fields = [
-        "timestamp", "trade_id", "symbol", "side", "exit_price",
-        "status", "exit_reason", "tp_hits", "pnl", "strategy"
+        "timestamp", "trade_id", "symbol", "side", "entry_price",
+        "sl", "tp1", "tp2", "tp3", "strategy", "status",
+        "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
     ]
 
     try:
@@ -49,7 +55,11 @@ def log_exit(trade):
         trade.get("exit_reason"),
         ",".join([f"TP{i+1}" for i in trade.get("hit", [])]) if trade.get("hit") else "",
         pnl,
-        trade.get("strategy", "unknown")
+        trade.get("strategy", "unknown"),
+        trade.get("status", "open"),
+        trade.get("ml_exit_reason", ""),
+        trade.get("ml_confidence", ""),
+        trade.get("ml_expected_pnl", "")
     ]
 
     write_csv_row(TRADE_LOG_PATH, fields, row)

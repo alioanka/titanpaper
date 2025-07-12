@@ -1,37 +1,25 @@
-# data/price_feed.py
+import os
+from binance.client import Client
+from dotenv import load_dotenv
 
-import requests
+load_dotenv()
 
-def get_latest_candle(symbol, interval="1m"):
-    """
-    Fetches the most recent closed candle for a given symbol and interval.
-    """
-    url = "https://api.binance.com/api/v3/klines"
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "limit": 2  # Get last 2 to ensure last one is closed
-    }
 
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        data = response.json()
+def get_latest_candle(symbol, interval="5m"):
+    api_key = os.getenv('BINANCE_API_KEY')
+    api_secret = os.getenv('BINANCE_API_SECRET')
+    client = Client(api_key, api_secret)
 
-        if len(data) < 2:
-            return None
-
-        # Use the last fully closed candle
-        kline = data[-2]
-        candle = {
-            "timestamp": int(kline[0]),
-            "open": float(kline[1]),
-            "high": float(kline[2]),
-            "low": float(kline[3]),
-            "close": float(kline[4]),
-            "volume": float(kline[5])
+    candles = client.get_klines(symbol=symbol, interval=interval, limit=1)
+    if candles:
+        c = candles[0]
+        return {
+            'open': float(c[1]),
+            'high': float(c[2]),
+            'low': float(c[3]),
+            'close': float(c[4]),
+            'volume': float(c[5]),
+            'volatility': abs(float(c[2]) - float(c[3])) / float(c[4])
         }
-        return candle
+    return None
 
-    except Exception as e:
-        print(f"❌ Error fetching price for {symbol}: {e}")
-        return None

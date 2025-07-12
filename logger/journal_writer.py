@@ -12,8 +12,10 @@ from utils.pnl_utils import calc_realistic_pnl
 def update_journal(trade):
     fields = [
         "timestamp", "trade_id", "symbol", "side", "entry_price", "exit_price",
-        "status", "exit_reason", "tp_hits", "pnl", "duration_sec", "balance", "strategy"
+        "status", "exit_reason", "tp_hits", "pnl", "duration_sec", "balance", "strategy",
+        "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
     ]
+
 
     now = time.time()
     entry_time = trade.get("entry_time", now)
@@ -43,7 +45,10 @@ def update_journal(trade):
         pnl,
         duration,
         load_last_balance(),
-        trade.get("strategy", "unknown")
+        trade.get("strategy", "unknown"),
+        trade.get("ml_exit_reason", ""),
+        trade.get("ml_confidence", ""),
+        trade.get("ml_expected_pnl", "")
     ]
 
     write_csv_row(JOURNAL_PATH, fields, row)
