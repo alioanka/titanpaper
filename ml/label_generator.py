@@ -10,6 +10,6 @@ def generate_labels(trade_df):
         elif row['pnl_pct'] >= 0.5:
             labels.append('TP1-Partial')
         else:
-            labels.append('Neutral')
+            labels.append('Neutral')  # <-- new neutral class
     trade_df['exit_reason'] = labels
     return trade_df

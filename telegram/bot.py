@@ -232,3 +232,7 @@ def run_telegram_polling():
 
 def send_startup_notice():
     bot.send_message(TELEGRAM_CHAT_ID, "🤖 TitanBot-Paper has started.\n" + COMMANDS_LIST)
+
+def send_live_alert(message):
+    bot.send_message(TELEGRAM_CHAT_ID, message)
+

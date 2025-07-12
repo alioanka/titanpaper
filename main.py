@@ -13,7 +13,7 @@ from engine.trade_tracker import check_open_trades, maybe_open_new_trade
 from logger.trade_logger import log_trade
 from logger.journal_writer import update_journal
 from core.indicator_utils import calculate_atr
-from telegram.bot import run_telegram_polling, send_startup_notice
+from telegram.bot import run_telegram_polling, send_startup_notice, send_live_alert
 from threading import Thread
 
 # Load secrets
@@ -130,6 +130,13 @@ def run_bot():
                             trade["ml_expected_pnl"] = ml_result['expected_pnl']
                             open_trades.append(trade)
                             log_trade(trade)
+                            alert_message = (
+                                f"🚀 {symbol} {signal['direction']} Signal\n"
+                                f"ML: {ml_result['exit_reason']} ({ml_result['confidence']:.2%})\n"
+                                f"PnL est.: {ml_result['expected_pnl']:.2f}%"
+                            )
+                            send_live_alert(alert_message)
+
 
                     else:
                         print(f"❌ No valid signal for {symbol}")
