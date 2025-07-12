@@ -134,7 +134,7 @@ def run_bot():
                                 f"ML: {ml_result['exit_reason']} ({ml_result['confidence']:.2%})\n"
                                 f"PnL est.: {ml_result['expected_pnl']:.2f}%"
                             )
-                            send_live_alert(alert_message)
+                            #send_live_alert(alert_message)
 
 
                     else:
