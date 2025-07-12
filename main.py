@@ -13,7 +13,7 @@ from engine.trade_tracker import check_open_trades, maybe_open_new_trade
 from logger.trade_logger import log_trade
 from logger.journal_writer import update_journal
 from core.indicator_utils import calculate_atr
-from telegram.bot import run_telegram_polling, send_startup_notice, send_live_alert
+from telegram.bot import send_live_alert, send_startup_notice
 from threading import Thread
 
 # Load secrets
@@ -93,7 +93,6 @@ def run_bot():
                         
                         # === ML integration (NEW) ===
                         from ml_predictor import predict_trade
-                        from core.indicator_utils import calculate_atr
 
                         df = get_recent_candles(symbol)
                         fallback_atr = symbol_atr_cache.get(symbol, 0.0)
@@ -154,5 +153,6 @@ def run_bot():
 
 
 if __name__ == "__main__":
-    Thread(target=run_telegram_polling, daemon=True).start()
+ #   Thread(target=run_telegram_polling, daemon=True).start()
     run_bot()
+

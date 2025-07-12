@@ -236,3 +236,6 @@ def send_startup_notice():
 def send_live_alert(message):
     bot.send_message(TELEGRAM_CHAT_ID, message)
 
+if __name__ == "__main__":
+    run_telegram_polling()
+
