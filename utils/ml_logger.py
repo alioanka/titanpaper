@@ -46,6 +46,10 @@ def log_ml_features(trade, trend, volatility, atr):
         "atr": round(atr, 5),
         "trend_strength": round(trend, 5),
         "volatility": round(volatility, 5),
+        "adx": round(trade.get("adx", 0.0), 5),
+        "rsi": round(trade.get("rsi", 0.0), 5),
+        "macd": round(trade.get("macd", 0.0), 5),
+        "ema_ratio": round(trade.get("ema_ratio", 1.0), 5),
         "pnl_pct": pnl_pct,
         "raw_profit": raw_profit,
         "duration_sec": duration,
@@ -53,6 +57,7 @@ def log_ml_features(trade, trend, volatility, atr):
         "leverage": leverage,
         "is_partial": 1 if "Partial" in trade.get("exit_reason", "") else 0
     }
+
 
     headers = list(row.keys())
     file_exists = os.path.isfile(ML_LOG_FILE)

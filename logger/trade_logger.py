@@ -7,10 +7,10 @@ from config import TRADE_LOG_PATH
 
 def log_trade(trade):
     fields = [
-        "timestamp", "trade_id", "symbol", "side", "entry_price",
-        "sl", "tp1", "tp2", "tp3", "strategy", "status",
-        "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
+        "timestamp", "trade_id", "symbol", "side", "entry_price", "sl", "tp1", "tp2", "tp3",
+        "strategy", "status", "ml_exit_reason", "ml_confidence", "ml_expected_pnl", "atr", "adx", "rsi", "macd", "ema_ratio"
     ]
+
 
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -26,8 +26,14 @@ def log_trade(trade):
         trade.get("status", "open"),
         trade.get("ml_exit_reason", ""),
         trade.get("ml_confidence", ""),
-        trade.get("ml_expected_pnl", "")
-        ]
+        trade.get("ml_expected_pnl", ""),
+        trade.get("atr", ""),
+        trade.get("adx", ""),
+        trade.get("rsi", ""),
+        trade.get("macd", ""),
+        trade.get("ema_ratio", "")
+    ]
+
 
     write_csv_row(TRADE_LOG_PATH, fields, row)
 

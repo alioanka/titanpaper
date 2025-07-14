@@ -15,6 +15,7 @@ from logger.journal_writer import update_journal
 from core.indicator_utils import calculate_atr
 from telegram.bot import send_live_alert, send_startup_notice
 from threading import Thread
+from ml.feature_builder import build_features
 
 # Load secrets
 load_dotenv()
@@ -99,14 +100,28 @@ def run_bot():
                         atr = calculate_atr(df) if df is not None else fallback_atr
                         symbol_atr_cache[symbol] = atr  # <-- update cache live per run
 
+                        # === PATCH: Calculate extra indicators safely ===
+                        adx, rsi, macd, ema_ratio = 0.0, 0.0, 0.0, 1.0
+                        if df is not None:
+                            df_indicators = build_features(df)
+                            if not df_indicators.empty:
+                                adx = df_indicators['adx'].iloc[-1]
+                                rsi = df_indicators['rsi'].iloc[-1]
+                                macd = df_indicators['macd'].iloc[-1]
+                                ema_ratio = df_indicators['ema_ratio'].iloc[-1]
+
                         signal_data = {
                             'symbol': symbol,
                             'side': signal['direction'],
                             'entry_price': candle['close'],
                             'atr': atr,
                             'trend_strength': signal['confidence'],
-                            'volatility': candle.get('volatility', 0.002),  # optionally improve from price_feed
-                            'duration_sec': 0
+                            'volatility': candle.get('volatility', 0.002),
+                            'duration_sec': 0,
+                            'adx': adx,
+                            'rsi': rsi,
+                            'macd': macd,
+                            'ema_ratio': ema_ratio
                         }
 
                         ml_result = predict_trade(signal_data)
@@ -115,11 +130,10 @@ def run_bot():
                         # Decide if we should proceed (soft filter)
                         if ml_result['exit_reason'] == 'SL' or ml_result['confidence'] < 0.5:
                             print(f"[ML] Skipping trade due to low confidence or SL prediction.")
-                            continue  # Skip to next symbol
+                            continue
 
                         # === Proceed to open trade ===
                         trade = maybe_open_new_trade(signal, candle, open_trades, fallback_atr=fallback_atr)
-
 
                         if trade:
                             trade["strategy"] = signal.get("strategy_name", DEFAULT_STRATEGY_NAME)
@@ -127,14 +141,23 @@ def run_bot():
                             trade["ml_exit_reason"] = ml_result['exit_reason']
                             trade["ml_confidence"] = ml_result['confidence']
                             trade["ml_expected_pnl"] = ml_result['expected_pnl']
+
+                            # === PATCH: Add new features to trade object ===
+                            trade["atr"] = atr
+                            trade["adx"] = adx
+                            trade["rsi"] = rsi
+                            trade["macd"] = macd
+                            trade["ema_ratio"] = ema_ratio
+
                             open_trades.append(trade)
                             log_trade(trade)
+
                             alert_message = (
                                 f"🚀 {symbol} {signal['direction']} Signal\n"
                                 f"ML: {ml_result['exit_reason']} ({ml_result['confidence']:.2%})\n"
                                 f"PnL est.: {ml_result['expected_pnl']:.2f}%"
                             )
-                            #send_live_alert(alert_message)
+                            # send_live_alert(alert_message)
 
 
                     else:

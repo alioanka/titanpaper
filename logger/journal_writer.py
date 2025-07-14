@@ -13,8 +13,9 @@ def update_journal(trade):
     fields = [
         "timestamp", "trade_id", "symbol", "side", "entry_price", "exit_price",
         "status", "exit_reason", "tp_hits", "pnl", "duration_sec", "balance", "strategy",
-        "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
+        "ml_exit_reason", "ml_confidence", "ml_expected_pnl", "atr", "adx", "rsi", "macd", "ema_ratio"
     ]
+
 
 
     now = time.time()
@@ -48,8 +49,14 @@ def update_journal(trade):
         trade.get("strategy", "unknown"),
         trade.get("ml_exit_reason", ""),
         trade.get("ml_confidence", ""),
-        trade.get("ml_expected_pnl", "")
+        trade.get("ml_expected_pnl", ""),
+        trade.get("atr", ""),
+        trade.get("adx", ""),
+        trade.get("rsi", ""),
+        trade.get("macd", ""),
+        trade.get("ema_ratio", "")
     ]
+
 
     write_csv_row(JOURNAL_PATH, fields, row)
 
