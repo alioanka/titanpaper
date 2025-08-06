@@ -17,6 +17,7 @@ from telegram.bot import send_live_alert, send_startup_notice
 from threading import Thread
 from ml.feature_builder import build_features
 from utils.terminal_logger import tlog
+from engine.position_model import update_position_status
 
 # Load secrets
 load_dotenv()
@@ -64,14 +65,18 @@ def run_bot():
 
                 tlog(f"🧠 {symbol} Candle fetched: O={candle['open']} C={candle['close']} H={candle['high']} L={candle['low']}")
 
-                open_trades, just_closed = check_open_trades(open_trades, candle)
+                # === Update TP/SL status for existing trades
+                for trade in open_trades:
+                    if trade["symbol"] == symbol and trade["status"] == "open":
+                        old_status = trade["status"]
+                        trade = update_position_status(trade, candle)
+                        if trade["status"] == "closed" and old_status != "closed":
+                            recently_closed_symbols.add(symbol)
 
-                if not isinstance(open_trades, list):
-                    tlog("🚨 open_trades corrupted, resetting.")
-                    open_trades = []
+                open_trades = [t for t in open_trades if t["status"] == "open"]
 
                 now = time.time()
-                for sym in just_closed:
+                for sym in recently_closed_symbols:
                     symbol_cooldowns[sym] = now + COOLDOWN_SECONDS
 
                 if symbol in recently_closed_symbols:
@@ -168,13 +173,8 @@ def run_bot():
             except Exception as e:
                 tlog(f"❌ Error for {symbol}: {e}")
 
-        recently_closed_symbols.update(
-            [t['symbol'] for t in open_trades if t.get('status') == 'closed']
-        )
-
+        recently_closed_symbols.clear()
         time.sleep(EVALUATION_INTERVAL)
 
-
 if __name__ == "__main__":
-    # Thread(target=run_telegram_polling, daemon=True).start()
     run_bot()
