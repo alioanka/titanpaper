@@ -1,7 +1,10 @@
+# logger/trade_logger.py
+
 import csv
 import os
 import time
 from config import TRADE_LOG_PATH
+from utils.terminal_logger import tlog
 
 def log_trade(trade):
     fields = [
@@ -33,6 +36,7 @@ def log_trade(trade):
     ]
 
     write_csv_row(TRADE_LOG_PATH, fields, row)
+    tlog(f"📝 Trade logged: {trade.get('symbol')} | Side: {trade.get('side')} | Price: {trade.get('entry_price')}")
 
 def write_csv_row(path, fields, row):
     file_exists = os.path.isfile(path)
@@ -42,20 +46,18 @@ def write_csv_row(path, fields, row):
             writer.writerow(fields)
         writer.writerow(row)
 
-
 def log_exit(trade):
     fields = [
-        "timestamp", "trade_id", "symbol", "side", "entry_price",
-        "sl", "tp1", "tp2", "tp3", "strategy", "status",
-        "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
+        "timestamp", "trade_id", "symbol", "side", "exit_price",
+        "status", "exit_reason", "tp_hits", "pnl",
+        "strategy", "final_status", "ml_exit_reason", "ml_confidence", "ml_expected_pnl"
     ]
 
     try:
         pnl = round(float(trade.get("pnl", 0.0)), 6)
     except Exception as e:
-        print(f"⚠️ PnL formatting error in trade_logger: {e} | value: {trade.get('pnl')}")
+        tlog(f"⚠️ PnL formatting error in trade_logger: {e} | value: {trade.get('pnl')}")
         pnl = 0.0
-
 
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -75,3 +77,4 @@ def log_exit(trade):
     ]
 
     write_csv_row(TRADE_LOG_PATH, fields, row)
+    tlog(f"📉 Trade closed: {trade.get('symbol')} | Exit: {trade.get('exit_reason')} | PnL: {pnl:.2f}%")

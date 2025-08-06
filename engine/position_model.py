@@ -5,6 +5,8 @@ import uuid
 from config import TP_MULTIPLIERS, SL_MULTIPLIER, TRAILING_START_AFTER_TP, TRAILING_GAP_ATR
 from logger.journal_writer import update_journal
 from logger.balance_tracker import update_balance
+from utils.terminal_logger import tlog
+
 
 def build_fake_trade(signal, candle, atr):
     entry = candle["close"]
@@ -13,22 +15,21 @@ def build_fake_trade(signal, candle, atr):
 
     if atr is None or atr <= 0 or not isinstance(entry, (int, float)):
         print(f"⚠️ Invalid ATR or entry for {signal['symbol']} — skipping trade")
+        tlog(f"⚠️ Invalid ATR or entry for {signal['symbol']} — skipping trade")
         return None
 
     # === Parameters
     MIN_SPREAD_PCT = 0.002  # 0.2%
-    min_atr = entry * 0.0015  # 0.15% minimum
+    min_atr = entry * 0.0015
     atr = max(atr, min_atr)
 
-
-    # SL and TP Levels
     sl = entry - atr * SL_MULTIPLIER if is_long else entry + atr * SL_MULTIPLIER
     tp_levels = [
         entry + atr * mult if is_long else entry - atr * mult
         for mult in TP_MULTIPLIERS
     ]
 
-    # === Enforce minimum TP1 spread (in case ATR is very low)
+    # Enforce minimum TP1 spread
     min_tp_distance = entry * MIN_SPREAD_PCT
     actual_tp1_distance = abs(tp_levels[0] - entry)
 
@@ -38,10 +39,7 @@ def build_fake_trade(signal, candle, atr):
         sl = entry - (entry - sl) * scale if is_long else entry + (sl - entry) * scale
 
     print(f"📊 {signal['symbol']} trade setup → SL: {sl:.2f}, TP1: {tp_levels[0]:.2f}, TP2: {tp_levels[1]:.2f}, TP3: {tp_levels[2]:.2f}")
-
-    if not isinstance(sl, (int, float)) or any(not isinstance(tp, (int, float)) for tp in tp_levels):
-        print(f"⚠️ Invalid SL/TP setup for {signal['symbol']}")
-        return None
+    tlog(f"{signal['symbol']} trade setup → SL: {sl:.2f}, TP1: {tp_levels[0]:.2f}, TP2: {tp_levels[1]:.2f}, TP3: {tp_levels[2]:.2f}")
 
     return {
         "trade_id": str(uuid.uuid4())[:8],
@@ -69,9 +67,6 @@ def build_fake_trade(signal, candle, atr):
     }
 
 
-
-
-
 def update_position_status(trade, candle):
     high = candle["high"]
     low = candle["low"]
@@ -79,23 +74,31 @@ def update_position_status(trade, candle):
     side = trade["side"]
     is_long = side == "LONG"
 
+    price_buffer = 0.0002  # 0.02% buffer to avoid fake hits
+
     if trade["status"] != "open":
         return trade
 
     if "tp" not in trade or not isinstance(trade["tp"], list) or len(trade["tp"]) < 3:
-        print(f"⚠️ Invalid TP structure: {trade}")
+        tlog(f"⚠️ Invalid TP structure: {trade}")
         trade["status"] = "closed"
         trade["exit_reason"] = "error"
         update_journal(trade)
         return trade
 
     # === SL HIT
-    sl_hit = (is_long and low <= trade["sl"]) or (not is_long and high >= trade["sl"])
+    sl_hit = (
+        is_long and (low <= trade["sl"] * (1 - price_buffer))
+    ) or (
+        not is_long and (high >= trade["sl"] * (1 + price_buffer))
+    )
+
     if sl_hit:
         trade["exit_price"] = trade["sl"]
         trade["status"] = "closed"
         trade["exit_reason"] = "SL"
         trade["closed_time"] = time.time()
+        tlog(f"🛑 SL hit: {trade['symbol']} @ {trade['sl']:.2f} | Candle: {low:.2f}–{high:.2f}")
         update_journal(trade)
         return trade
 
@@ -104,26 +107,30 @@ def update_position_status(trade, candle):
         if i in trade["hit"]:
             continue
 
-        tp_hit = (is_long and high >= tp) or (not is_long and low <= tp)
+        tp_hit = (
+            is_long and high >= tp * (1 - price_buffer)
+        ) or (
+            not is_long and low <= tp * (1 + price_buffer)
+        )
+
         if tp_hit:
             trade["hit"].append(i)
-            print(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f}")
+            tlog(f"🎯 TP{i+1} hit: {trade['symbol']} {side} @ {tp:.2f} | Candle: {low:.2f}–{high:.2f}")
 
-            # TP3 closes the trade
             if i == 2:
                 trade["exit_price"] = tp
                 trade["status"] = "closed"
                 trade["exit_reason"] = "TP3"
                 trade["closed_time"] = time.time()
+                tlog(f"🚪 {trade['symbol']} closed due to TP3 @ {tp:.2f}")
                 update_journal(trade)
                 return trade
 
-            # Enable trailing SL after any TP
             if not trade["trailing"]["enabled"]:
                 trade["trailing"]["enabled"] = True
-                print(f"🔁 Trailing SL activated for {trade['symbol']} after TP{i+1}")
+                tlog(f"🔁 Trailing SL activated for {trade['symbol']} after TP{i+1}")
 
-            # Log fake exit for ML purposes only
+            # Partial log
             fake_trade = trade.copy()
             fake_trade["exit_price"] = tp
             fake_trade["exit_reason"] = f"TP{i+1}-Partial"
@@ -134,47 +141,40 @@ def update_position_status(trade, candle):
             from utils.ml_logger import log_ml_features
             log_ml_features(fake_trade, trade.get("trend_strength", 0), trade.get("volatility", 0), trade.get("atr", 0))
 
-
-            # Log journal and ML on TP1/TP2
             update_journal(trade)
-            return trade  # stay open
+            return trade
 
-    # === Trailing SL Logic
+    # === Trailing SL
     if trade["trailing"]["enabled"]:
         trail = trade["trailing"]
 
-    if not trail["triggered"]:
-        # Wait at least 1 full candle after TP1 to activate trailing SL
-        entry_time = trade.get("entry_time", 0)
-        if time.time() - entry_time < 60:  # 🕒 You can change this to 60, 90, or more seconds
-            print(f"⏳ Trailing SL delayed for {trade['symbol']} — too soon after TP1")
-            return trade
-        trail["triggered"] = True
-        trail["sl"] = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
-        print(f"🟢 Trailing SL initialized for {trade['symbol']} @ {trail['sl']:.4f}")
+        if not trail["triggered"]:
+            if time.time() - trade.get("entry_time", 0) < TRAILING_START_AFTER_TP:
+                tlog(f"⏳ Trailing SL delayed for {trade['symbol']} — too soon after TP1")
+                return trade
 
+            trail["triggered"] = True
+            trail["sl"] = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
+            tlog(f"🟢 Trailing SL initialized for {trade['symbol']} @ {trail['sl']:.4f}")
 
         new_sl = close - trail["sl_gap"] if is_long else close + trail["sl_gap"]
         if (is_long and new_sl > trail["sl"]) or (not is_long and new_sl < trail["sl"]):
             trail["sl"] = new_sl
-            print(f"🔄 Trailing SL moved to {trail['sl']:.4f} for {trade['symbol']}")
+            tlog(f"🔄 Trailing SL moved to {trail['sl']:.4f} for {trade['symbol']}")
 
-        trailing_hit = (is_long and low <= trail["sl"]) or (not is_long and high >= trail["sl"])
+        trailing_hit = (
+            is_long and low <= trail["sl"] * (1 - price_buffer)
+        ) or (
+            not is_long and high >= trail["sl"] * (1 + price_buffer)
+        )
+
         if trailing_hit:
             trade["exit_price"] = trail["sl"]
             trade["status"] = "closed"
             trade["exit_reason"] = "TP1–2" if len(trade.get("hit", [])) in [1, 2] else "TrailingSL"
-
             trade["closed_time"] = time.time()
-            print(f"📌 Trailing SL hit for {trade['symbol']} @ {trail['sl']:.4f}")
+            tlog(f"📌 Trailing SL hit for {trade['symbol']} @ {trail['sl']:.4f}")
             update_journal(trade)
             return trade
 
     return trade
-
-
-
-
-
-
-

@@ -1,9 +1,10 @@
-# ml_logger.py
+# utils/ml_logger.py
 
 import csv
 import os
 from datetime import datetime
 from utils.pnl_utils import calc_realistic_pnl
+from utils.terminal_logger import tlog
 
 ML_LOG_FILE = "ml_log.csv"
 
@@ -27,7 +28,7 @@ def log_ml_features(trade, trend, volatility, atr):
         duration = round(float(trade.get("closed_time", 0)) - float(trade.get("entry_time", 0)), 2)
 
     except Exception as e:
-        print(f"⚠️ ML log calc error: {e}")
+        tlog(f"⚠️ ML log calc error: {e}")
         return
 
     tp = trade.get("tp", [])
@@ -58,12 +59,13 @@ def log_ml_features(trade, trend, volatility, atr):
         "is_partial": 1 if "Partial" in trade.get("exit_reason", "") else 0
     }
 
-
     headers = list(row.keys())
     file_exists = os.path.isfile(ML_LOG_FILE)
 
-    with open(ML_LOG_FILE, "a", newline="") as f:
+    with open(ML_LOG_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=headers)
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
+
+    tlog(f"📦 ML logged: {trade['symbol']} | {trade.get('exit_reason')} | PnL: {pnl_pct:.2f}%")

@@ -8,6 +8,7 @@ from logger.journal_writer import update_journal
 from logger.balance_tracker import load_last_balance, update_balance
 from utils.pnl_utils import calc_realistic_pnl
 from utils.ml_logger import log_ml_features
+from utils.terminal_logger import tlog
 
 
 def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
@@ -16,26 +17,27 @@ def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
         return None
 
     df = fetch_recent_candles(symbol)
-    print(f"✅ Successfully fetched {len(df)} candles for {symbol}")
-
     if df is None:
+        tlog(f"❌ No candle data to open trade for {symbol}")
         return None
 
-    atr = calculate_atr(df)
-    print(f"📐 {symbol} ATR: {atr:.5f}")
+    tlog(f"✅ Successfully fetched {len(df)} candles for {symbol}")
 
+    atr = calculate_atr(df)
     if not atr or atr == 0:
         atr = fallback_atr
-        print(f"⚠️ Using fallback ATR for {symbol}: {atr:.5f}")
+        tlog(f"⚠️ Using fallback ATR for {symbol}: {atr:.5f}")
         if not atr or atr == 0:
             return None
 
-    trade = build_fake_trade(signal, candle, atr)
+    tlog(f"📐 {symbol} ATR: {atr:.5f}")
 
+    trade = build_fake_trade(signal, candle, atr)
     if not trade:
-        print(f"❌ Failed to create trade for {symbol}")
+        tlog(f"❌ Failed to create trade for {symbol}")
         return None
-    print(f"📈 Fake trade opened: {trade['symbol']} {trade['side']} @ {trade['entry_price']}")
+
+    tlog(f"📈 Fake trade opened: {trade['symbol']} {trade['side']} @ {trade['entry_price']}")
     return trade
 
 
@@ -54,14 +56,12 @@ def check_open_trades(open_trades, current_candle):
                 updated.get("leverage", 1)
             )
             if pnl_check < 0.1:
-                print(f"⚠️ Skipping ML log for TP1–2 with tiny PnL: {pnl_check:.5f}%")
+                tlog(f"⚠️ Skipping ML log for TP1–2 with tiny PnL: {pnl_check:.5f}%")
                 continue
-
 
         # ✅ Partial TP balance logic
         num_hits = len(updated.get("hit", []))
         if num_hits > 0 and "partial_credit" not in updated and updated["status"] != "closed":
-
             partial_pct = 0.33 * num_hits  # TP1 = 33%, TP1+TP2 = 66%
             updated["partial_credit"] = True
 
@@ -78,11 +78,11 @@ def check_open_trades(open_trades, current_candle):
             new_balance = last_balance + gain
 
             update_balance(new_balance)
-            print(f"💡 Partial TP balance applied ({partial_pct:.0%}): +{gain:.2f} → {new_balance:.2f}")
+            tlog(f"💡 Partial TP balance applied ({partial_pct:.0%}): +{gain:.2f} → {new_balance:.2f}")
 
         # ✅ Final closure
         if updated["status"] == "closed":
-            print(f"🚪 {updated['symbol']} closed due to {updated.get('exit_reason')} @ {updated.get('exit_price')}")
+            tlog(f"🚪 {updated['symbol']} closed due to {updated.get('exit_reason')} @ {updated.get('exit_price')}")
 
             last_balance = load_last_balance()
             pnl_pct = calc_realistic_pnl(
@@ -98,8 +98,8 @@ def check_open_trades(open_trades, current_candle):
             new_balance = last_balance + profit_or_loss
             update_balance(new_balance)
 
-            print(f"🧠 Logging ML trade: {updated['symbol']} | Reason: {updated['exit_reason']} | PnL: {pnl_pct:+.5f}")
-            print(f"💰 Balance updated: {last_balance:.2f} → {new_balance:.2f} ({pnl_pct:+.2f}%)")
+            tlog(f"🧠 Logging ML trade: {updated['symbol']} | Reason: {updated['exit_reason']} | PnL: {pnl_pct:+.5f}")
+            tlog(f"💰 Balance updated: {last_balance:.2f} → {new_balance:.2f} ({pnl_pct:+.2f}%)")
 
             update_journal(updated)
             log_exit(updated)

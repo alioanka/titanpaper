@@ -1,9 +1,12 @@
+# logger/journal_writer.py
+
 import csv
 import os
 import time
 from config import JOURNAL_PATH
 from logger.balance_tracker import load_last_balance
 from utils.pnl_utils import calc_realistic_pnl
+from utils.terminal_logger import tlog
 
 def update_journal(trade):
     fields = [
@@ -15,16 +18,18 @@ def update_journal(trade):
     now = time.time()
     entry_time = trade.get("entry_time", now)
     duration = int(now - entry_time)
+
     trade["pnl"] = calc_realistic_pnl(
         trade.get("entry_price"),
         trade.get("exit_price"),
         trade.get("side"),
         trade.get("leverage", 1)
     )
+
     try:
         pnl = round(float(trade.get("pnl", 0.0)), 6)
     except Exception as e:
-        print(f"⚠️ PnL formatting error: {e} | raw value: {trade.get('pnl')}")
+        tlog(f"⚠️ PnL formatting error: {e} | raw value: {trade.get('pnl')}")
         pnl = 0.0
 
     row = [
@@ -41,7 +46,7 @@ def update_journal(trade):
         duration,
         load_last_balance(),
         trade.get("strategy", "unknown"),
-        trade.get("ml_exit_reason", ""),  # ✅ FIXED
+        trade.get("ml_exit_reason", ""),
         round(float(trade.get("ml_confidence", 0)), 6),
         round(float(trade.get("ml_expected_pnl", 0)), 6),
         round(float(trade.get("atr", 0)), 6),
@@ -51,6 +56,7 @@ def update_journal(trade):
         round(float(trade.get("ema_ratio", 0)), 6)
     ]
 
+    tlog(f"📘 Journal updated for {trade.get('symbol')} | PnL: {pnl:.4f} | Exit: {trade.get('exit_reason')}")
     write_csv_row(JOURNAL_PATH, fields, row)
 
 def write_csv_row(path, fields, row):
