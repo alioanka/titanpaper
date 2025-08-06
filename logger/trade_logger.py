@@ -1,5 +1,3 @@
-# logger/trade_logger.py
-
 import csv
 import os
 import time
@@ -8,9 +6,9 @@ from config import TRADE_LOG_PATH
 def log_trade(trade):
     fields = [
         "timestamp", "trade_id", "symbol", "side", "entry_price", "sl", "tp1", "tp2", "tp3",
-        "strategy", "status", "ml_exit_reason", "ml_confidence", "ml_expected_pnl", "atr", "adx", "rsi", "macd", "ema_ratio"
+        "strategy", "status", "ml_exit_reason", "ml_confidence", "ml_expected_pnl",
+        "atr", "adx", "rsi", "macd", "ema_ratio"
     ]
-
 
     row = [
         time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -25,17 +23,25 @@ def log_trade(trade):
         trade.get("strategy", "unknown"),
         trade.get("status", "open"),
         trade.get("ml_exit_reason", ""),
-        trade.get("ml_confidence", ""),
-        trade.get("ml_expected_pnl", ""),
-        trade.get("atr", ""),
-        trade.get("adx", ""),
-        trade.get("rsi", ""),
-        trade.get("macd", ""),
-        trade.get("ema_ratio", "")
+        round(float(trade.get("ml_confidence", 0)), 6),
+        round(float(trade.get("ml_expected_pnl", 0)), 6),
+        round(float(trade.get("atr", 0)), 6),
+        round(float(trade.get("adx", 0)), 6),
+        round(float(trade.get("rsi", 0)), 6),
+        round(float(trade.get("macd", 0)), 6),
+        round(float(trade.get("ema_ratio", 0)), 6)
     ]
 
-
     write_csv_row(TRADE_LOG_PATH, fields, row)
+
+def write_csv_row(path, fields, row):
+    file_exists = os.path.isfile(path)
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, quotechar='"', escapechar='\\')
+        if not file_exists:
+            writer.writerow(fields)
+        writer.writerow(row)
+
 
 def log_exit(trade):
     fields = [
@@ -69,11 +75,3 @@ def log_exit(trade):
     ]
 
     write_csv_row(TRADE_LOG_PATH, fields, row)
-
-def write_csv_row(path, fields, row):
-    file_exists = os.path.isfile(path)
-    with open(path, "a", newline="") as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(fields)
-        writer.writerow(row)

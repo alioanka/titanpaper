@@ -100,15 +100,22 @@ def run_bot():
                         atr = calculate_atr(df) if df is not None else fallback_atr
                         symbol_atr_cache[symbol] = atr  # <-- update cache live per run
 
-                        # === PATCH: Calculate extra indicators safely ===
-                        adx, rsi, macd, ema_ratio = 0.0, 0.0, 0.0, 1.0
-                        if df is not None:
+                        # === PATCH: Calculate extra indicators ===
+                        adx, rsi, macd, ema_ratio, volatility = 0.0, 0.0, 0.0, 1.0, 0.002
+                        if df is not None and not df.empty:
                             df_indicators = build_features(df)
                             if not df_indicators.empty:
                                 adx = df_indicators['adx'].iloc[-1]
                                 rsi = df_indicators['rsi'].iloc[-1]
                                 macd = df_indicators['macd'].iloc[-1]
                                 ema_ratio = df_indicators['ema_ratio'].iloc[-1]
+                                volatility = df_indicators['volatility'].iloc[-1]
+                            else:
+                                print(f"⚠️ Indicator DataFrame is empty for {symbol}, skipping.")
+                                continue
+                        else:
+                            print(f"⚠️ No candle data for {symbol}, skipping.")
+                            continue
 
                         signal_data = {
                             'symbol': symbol,
@@ -116,7 +123,7 @@ def run_bot():
                             'entry_price': candle['close'],
                             'atr': atr,
                             'trend_strength': signal['confidence'],
-                            'volatility': candle.get('volatility', 0.002),
+                            'volatility': volatility,
                             'duration_sec': 0,
                             'adx': adx,
                             'rsi': rsi,

@@ -15,7 +15,7 @@ side_encoder = LabelEncoder()
 exit_encoder = LabelEncoder()
 
 def prepare_encoders(data_path='ml_log.csv'):
-    data = pd.read_csv(data_path)
+    data = pd.read_csv(data_path, on_bad_lines='skip')
     symbol_encoder.fit(data['symbol'])
     side_encoder.fit(data['side'])
     exit_encoder.fit(data['exit_reason'])
@@ -30,19 +30,22 @@ def predict_trade(signal_data):
         'atr': signal_data['atr'],
         'trend_strength': signal_data['trend_strength'],
         'volatility': signal_data['volatility'],
-        'duration_sec': signal_data['duration_sec']
+        'duration_sec': signal_data['duration_sec'],
+        'adx': signal_data['adx'],
+        'rsi': signal_data['rsi'],
+        'macd': signal_data['macd'],
+        'ema_ratio': signal_data['ema_ratio']
     }
-    df = pd.DataFrame([features])
 
+    df = pd.DataFrame([features])
     pred_class_probs = clf.predict_proba(df)[0]
     pred_class_idx = np.argmax(pred_class_probs)
     pred_class_label = exit_encoder.inverse_transform([pred_class_idx])[0]
     pred_class_confidence = pred_class_probs[pred_class_idx]
-
     pred_pnl = reg.predict(df)[0]
 
     return {
         'exit_reason': pred_class_label,
-        'confidence': pred_class_confidence,
-        'expected_pnl': pred_pnl
+        'confidence': round(pred_class_confidence, 6),
+        'expected_pnl': round(pred_pnl, 6)
     }
