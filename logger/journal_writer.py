@@ -41,7 +41,7 @@ def update_journal(trade):
         duration,
         load_last_balance(),
         trade.get("strategy", "unknown"),
-        round(float(trade.get("ml_exit_reason", 0)), 6) if trade.get("ml_exit_reason") else "",
+        trade.get("ml_exit_reason", ""),  # ✅ FIXED
         round(float(trade.get("ml_confidence", 0)), 6),
         round(float(trade.get("ml_expected_pnl", 0)), 6),
         round(float(trade.get("atr", 0)), 6),
