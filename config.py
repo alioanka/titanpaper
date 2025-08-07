@@ -1,4 +1,5 @@
 # config.py
+import os
 
 ### === GENERAL SETTINGS === ###
 BOT_NAME = "TitanBot-Paper"
@@ -40,3 +41,5 @@ TELEGRAM_CHAT_ID = "462007586"
 
 EVALUATION_INTERVAL = 30
 DEFAULT_STRATEGY_NAME = "SmartTrendStrategy"
+
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
