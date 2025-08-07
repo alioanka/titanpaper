@@ -1,6 +1,9 @@
 # engine/trade_tracker.py
 
+import os
+import time
 from config import *
+from config import LOG_DIR, RISK_PER_TRADE
 from core.indicator_utils import fetch_recent_candles, calculate_atr
 from engine.position_model import build_fake_trade, update_position_status
 from logger.trade_logger import log_exit
@@ -9,6 +12,8 @@ from logger.balance_tracker import load_last_balance, update_balance
 from utils.pnl_utils import calc_realistic_pnl
 from utils.ml_logger import log_ml_features
 from utils.terminal_logger import tlog
+
+HEARTBEAT_FILE = os.path.join(LOG_DIR, ".last_heartbeat")
 
 
 def maybe_open_new_trade(signal, candle, open_trades, fallback_atr=0.0):
@@ -113,4 +118,22 @@ def check_open_trades(open_trades, current_candle):
         else:
             still_open.append(updated)
 
+    append_balance_heartbeat()  # ✅ Add heartbeat if nothing was closed
     return still_open, just_closed
+
+
+def append_balance_heartbeat():
+    """Appends balance snapshot once per hour if nothing closed."""
+    now = time.time()
+    if os.path.exists(HEARTBEAT_FILE):
+        with open(HEARTBEAT_FILE, "r") as f:
+            last_ts = float(f.read().strip())
+            if now - last_ts < 3600:
+                return  # Skip if not yet an hour
+
+    last_balance = load_last_balance()
+    update_balance(last_balance)
+    tlog(f"⏱️ Balance heartbeat snapshot logged: {last_balance:.2f}")
+
+    with open(HEARTBEAT_FILE, "w") as f:
+        f.write(str(now))
