@@ -19,3 +19,5 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+
+terminal_log.txt
