@@ -104,19 +104,50 @@ if _TELEGRAM_ENABLED:
         except Exception as e:
             bot.reply_to(message, f"⚠️ lasttrade error: {e}")
 
+    # telegram/bot.py  (only the /log handler changed)
+    # ...
     @bot.message_handler(commands=['log'])
     def cmd_log(message):
         try:
+            import pandas as pd, os
             if not os.path.exists(TRADE_LOG_PATH):
-                bot.reply_to(message, "No trade_log.csv yet."); return
+                bot.reply_to(message, "No trade_log.csv yet.")
+                return
             df = pd.read_csv(TRADE_LOG_PATH)
-            closed = df[df["status"].astype(str).str.lower()=="closed"] if "status" in df.columns else df
-            if closed.empty:
-                bot.reply_to(message, "No closed trades yet."); return
+
+            closed = None
+            if "status" in df.columns:
+                tmp = df[df["status"].astype(str).str.lower()=="closed"]
+                if not tmp.empty:
+                    closed = tmp
+
+            # Heuristic fallback for legacy misaligned rows:
+            # detect rows where 'tp1' literally contains 'closed'
+            if closed is None or closed.empty:
+                if "tp1" in df.columns:
+                    tmp = df[df["tp1"].astype(str).str.lower()=="closed"]
+                    if not tmp.empty:
+                        closed = tmp
+
+            # Final fallback: use journal.csv (ground truth)
+            if closed is None or closed.empty:
+                if os.path.exists(JOURNAL_PATH):
+                    jdf = pd.read_csv(JOURNAL_PATH)
+                    if "status" in jdf.columns:
+                        jdf = jdf[jdf["status"].astype(str).str.lower()=="closed"]
+                    if not jdf.empty:
+                        row = jdf.tail(1).to_dict("records")[0]
+                        bot.reply_to(message, f"🧾 Trade log (last closed from journal):\n{row}")
+                        return
+                bot.reply_to(message, "No closed trades yet.")
+                return
+
             row = closed.tail(1).to_dict("records")[0]
             bot.reply_to(message, f"🧾 Trade log (last closed):\n{row}")
         except Exception as e:
             bot.reply_to(message, f"⚠️ log error: {e}")
+    # ...
+
 
     @bot.message_handler(commands=['journal'])
     def cmd_journal(message):
