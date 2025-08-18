@@ -15,6 +15,7 @@ import time
 import uuid
 import pandas as pd
 from dotenv import load_dotenv
+from threading import Thread  # ✅ added
 
 from config import (
     SYMBOLS,
@@ -30,7 +31,7 @@ from core.signal_engine import generate_signal
 from core.indicator_utils import fetch_recent_candles, calculate_atr
 from engine.position_model import build_fake_trade  # construct paper trade object
 from engine.trade_tracker import check_open_trades, maybe_open_new_trade
-from telegram.bot import send_live_alert, send_startup_notice
+from telegram.bot import send_live_alert, send_startup_notice, run_telegram_polling  # ✅ added run_telegram_polling
 from utils.terminal_logger import tlog
 
 # Optional: use ML predictor if available
@@ -92,7 +93,10 @@ def run_bot():
 
     tlog("🚀 TitanBot-Paper starting…")
     try:
+        # ✅ start Telegram polling in the background, then send startup notice
+        Thread(target=run_telegram_polling, daemon=True).start()
         send_startup_notice()
+        tlog("☎️ Telegram polling started (background).")
     except Exception as e:
         tlog(f"⚠️ Telegram startup notice failed (continuing): {e}")
 
