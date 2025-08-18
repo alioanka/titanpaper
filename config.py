@@ -1,77 +1,60 @@
 # config.py
 import os
 
-### === GENERAL SETTINGS === ###
+# ========== General ==========
 BOT_NAME = "TitanBot-Paper"
 BASE_CURRENCY = "USDT"
 EXCHANGE = "binance"
 MODE = "paper"
 
-### === SYMBOLS TO TRACK === ###
-SYMBOLS = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT"
-]
+# Symbols you want to track
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 
-### === STRATEGY SETTINGS === ###
-TIMEFRAME = "5m"  # Binance supported intervals: 1m, 3m, 5m, 15m, etc.
-MIN_TREND_STRENGTH = 0.0001
-MIN_VOLATILITY = 0.0003  # % per candle
+# ========== Paths ==========
+LOG_DIR = os.getenv("LOG_DIR", "logs")
 
-### === PAPER TRADING CONFIG === ###
-INITIAL_BALANCE = 5000.0
-MAX_RISK_PER_TRADE = 0.02  # 2% of balance
-TP_MULTIPLIERS = [6, 9, 14]
-SL_MULTIPLIER = 4
-MIN_SPREAD_PCT = 0.002  # 0.2%
-#TRAILING_START_AFTER_TP = 1  # After TP1, activate trailing
-#TRAILING_GAP_ATR = 0.5
-RISK_PER_TRADE = 0.02  # 2% of total balance per trade
+# Ensure canonical relative paths (writers will create dir lazily)
+TRADE_LOG_PATH = os.path.join(LOG_DIR, "trade_log.csv")
+JOURNAL_PATH    = os.path.join(LOG_DIR, "journal.csv")
+BALANCE_LOG_PATH = os.path.join(LOG_DIR, "balance_history.csv")
 
+# ML log stays in project root (do NOT move)
+ML_LOG_FILE = "ml_log.csv"
 
-### === LOGGING === ###
-#TRADE_LOG_PATH = "logs/trade_log.csv"
-#JOURNAL_PATH = "logs/journal.csv"
-#BALANCE_LOG_PATH = "logs/balance_history.csv"
+# ========== Telegram ==========
+TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN", "")   # set in .env
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "") # set in .env
 
-# Telegram Bot Config
-TELEGRAM_TOKEN = "7678357905:AAEe0MfHa4ZYhFnDhlUPL2oDaNXSoLo-YaM"
-TELEGRAM_CHAT_ID = "462007586"
+# ========== Engine / Risk ==========
+INITIAL_BALANCE = float(os.getenv("INITIAL_BALANCE", "5000"))
 
-EVALUATION_INTERVAL = 30
-DEFAULT_STRATEGY_NAME = "SmartTrendStrategy"
+# Timeframe and loop interval
+TIMEFRAME = os.getenv("TIMEFRAME", "5m")         # more trades: "3m"
+EVALUATION_INTERVAL = int(os.getenv("EVAL_SECS", "60"))
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-# =========================
-# 📂 Logging & Data Paths
-# =========================
-import os as _os
+# Entry filters — loosen carefully to increase trade count
+MIN_TREND_STRENGTH = float(os.getenv("MIN_TREND_STRENGTH", "0.0008"))  # 0.08%
+MIN_VOLATILITY     = float(os.getenv("MIN_VOLATILITY", "0.0009"))      # 0.09%
 
-# Project root and logs dir
-_BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
-LOG_DIR = _os.path.join(_BASE_DIR, "logs")
-_os.makedirs(LOG_DIR, exist_ok=True)
+# Cooldown per symbol after a close (seconds)
+COOLDOWN_SECONDS = int(os.getenv("COOLDOWN_SECONDS", "600"))
 
-# File paths used across the project
-BALANCE_LOG_PATH = _os.path.join(LOG_DIR, "balance_history.csv")
-TRADE_LOG_PATH   = _os.path.join(LOG_DIR, "trade_log.csv")
-JOURNAL_PATH     = _os.path.join(LOG_DIR, "journal.csv")
+# ========== TP/SL ==========
+# True Range derived stops/targets (multipliers of ATR)
+TP_MULTIPLIERS = [3.0, 5.0, 8.0]
+SL_MULTIPLIER  = 1.5
 
-# ⚠️ IMPORTANT: ML log stays in project root to match utils/ml_logger.py (ML_LOG_FILE = "ml_log.csv")
-# Do NOT move it to LOG_DIR unless you also change utils/ml_logger.py.
-
-# Ensure CSVs are created lazily by their writers (no eager create here).
-
-# =========================
-# 🧭 Strategy Tweaks (safer TP3 capture in bull runs)
-# =========================
-# Start trailing only AFTER TP2 has hit (prevents cutting big trends early)
+# Start trailing only AFTER which TP index? (2 => after TP2)
 TRAILING_START_AFTER_TP = 2
 
-# Widen trailing gap a bit (was likely too tight)
-# Typical range: 1.0–1.3 ATR for 5m trend-following
+# Trailing gap in ATR units (wider = less premature stopouts)
 TRAILING_GAP_ATR = 1.1
 
-# (Optional) If TP3 is rarely reached, consider slightly nearer targets:
-# TP_MULTIPLIERS = [2.5, 4.0, 6.5]  # <= uncomment only if you want closer TP3
+# Price buffer to avoid wick noise (0.02% default)
+PRICE_BUFFER_PCT = float(os.getenv("PRICE_BUFFER_PCT", "0.0002"))
+
+# ========== Misc ==========
+# Max expected duration in seconds before forcing close (optional; set 0 to disable)
+MAX_TRADE_DURATION_SEC = int(os.getenv("MAX_TRADE_DURATION_SEC", "0"))
+
+# Writers create dirs lazily; nothing to pre-create here.

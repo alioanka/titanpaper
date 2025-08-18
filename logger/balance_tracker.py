@@ -1,8 +1,8 @@
 # logger/balance_tracker.py
-
 import os
 import csv
 import time
+from typing import Optional
 from config import BALANCE_LOG_PATH, INITIAL_BALANCE
 
 def _ensure_parent_dir(path: str):
@@ -10,36 +10,36 @@ def _ensure_parent_dir(path: str):
     if parent and not os.path.exists(parent):
         os.makedirs(parent, exist_ok=True)
 
-def load_last_balance():
-    """
-    Returns the most recent balance from file or fallback to initial.
-    Gracefully handles a missing or empty file.
-    """
-    # If the file doesn't exist yet, return initial balance
-    if not os.path.exists(BALANCE_LOG_PATH):
-        return INITIAL_BALANCE
-
+def _read_last_csv_row(path: str) -> Optional[list]:
     try:
-        with open(BALANCE_LOG_PATH, "r", encoding="utf-8") as f:
-            # Keep only data lines (skip header lines)
-            lines = [line.strip() for line in f if "," in line and not line.lower().startswith("timestamp")]
-        if not lines:
-            return INITIAL_BALANCE
+        with open(path, "r", encoding="utf-8") as f:
+            last = None
+            for row in csv.reader(f):
+                if row and row[0] != "timestamp":
+                    last = row
+            return last
+    except Exception:
+        return None
 
-        # Last CSV line format: "YYYY-mm-dd HH:MM:SS,<balance>"
-        last = lines[-1].split(",")
-        if len(last) >= 2:
-            return float(last[-1])
-        return INITIAL_BALANCE
-
-    except Exception as e:
-        print(f"⚠️ Error reading last balance: {e}")
-        return INITIAL_BALANCE
-
-def update_balance(new_balance):
+def load_last_balance() -> float:
     """
-    Appends new balance snapshot to balance history.
-    Ensures directory exists and writes CSV header once.
+    Returns the most recent balance from file or INITIAL_BALANCE.
+    """
+    try:
+        if not os.path.exists(BALANCE_LOG_PATH) or os.path.getsize(BALANCE_LOG_PATH) == 0:
+            return round(INITIAL_BALANCE, 2)
+        last = _read_last_csv_row(BALANCE_LOG_PATH)
+        if not last:
+            return round(INITIAL_BALANCE, 2)
+        bal = float(last[1])
+        return round(bal, 2)
+    except Exception as e:
+        print(f"⚠️ load_last_balance error: {e}")
+        return round(INITIAL_BALANCE, 2)
+
+def update_balance(new_balance: float):
+    """
+    Append a balance snapshot as (timestamp, balance). Never crashes the loop.
     """
     try:
         balance_value = round(float(new_balance), 2)

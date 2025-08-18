@@ -1,19 +1,24 @@
-def generate_labels(trade_df):
-    labels = []
-    for idx, row in trade_df.iterrows():
-        if row['exit_reason'] == 'TRAILING_STOP':
-            labels.append('TRAILING_STOP')
-        elif row['exit_reason'] == 'TIMEOUT':
-            labels.append('TIMEOUT')
-        elif row['pnl_pct'] <= -0.5:
-            labels.append('SL')
-        elif row['pnl_pct'] >= 2.0:
-            labels.append('TP3')
-        elif row['pnl_pct'] >= 1.0:
-            labels.append('TP2-Partial')
-        elif row['pnl_pct'] >= 0.5:
-            labels.append('TP1-Partial')
-        else:
-            labels.append('Neutral')
-    trade_df['exit_reason'] = labels
-    return trade_df
+# ml/label_generator.py
+import pandas as pd
+
+def normalize_exit_reason(x: str) -> str:
+    s = str(x or "").strip().lower()
+    if s in {"tp3","tp_3","takeprofit3"}:
+        return "TP3"
+    if "tp" in s and "3" not in s:
+        return "TP1–2"
+    if "trailing" in s:
+        return "TrailingSL"
+    if s in {"sl","stop","stoploss","stop_loss"}:
+        return "SL"
+    return "Other"
+
+def generate_labels(trade_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Accepts journal CLOSED trades; returns DataFrame with normalized exit_reason labels.
+    """
+    df = trade_df.copy()
+    if "exit_reason" not in df.columns:
+        df["exit_reason"] = "Other"
+    df["exit_reason"] = df["exit_reason"].apply(normalize_exit_reason)
+    return df
