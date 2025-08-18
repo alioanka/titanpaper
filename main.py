@@ -32,6 +32,9 @@ from core.indicator_utils import fetch_recent_candles, calculate_atr
 from engine.position_model import build_fake_trade  # construct paper trade object
 from engine.trade_tracker import check_open_trades, maybe_open_new_trade
 from telegram.bot import send_live_alert, send_startup_notice, run_telegram_polling  # ✅ added run_telegram_polling
+from logger.open_positions_store import load_open_positions, save_open_positions
+from engine.trade_tracker import finalize_close
+from engine.position_model import update_position_status
 from utils.terminal_logger import tlog
 
 # Optional: use ML predictor if available
@@ -50,6 +53,40 @@ except Exception as _e:
     tlog(f"⚠️ Feature builder unavailable, ML features limited: {_e}")
     _HAS_FB = False
 
+def _catch_up_open_positions(open_trades: list):
+    """
+    On restart, replay recent candles through each open trade so any SL/TP
+    hit during downtime is honored. Uses a fixed ATR snapshot per symbol (safe enough for catch-up).
+    """
+    for trade in list(open_trades):
+        try:
+            symbol = trade["symbol"]
+            # Fetch a reasonable window; if TIMEFRAME is 3m/5m this covers 6–10 hours
+            df, feats, atr_val = _get_features_for_symbol(symbol, interval=TIMEFRAME, limit=200)
+            if df is None or df.empty:
+                continue
+            atr_val = atr_val or 0.0
+
+            # Replay forward
+            for _, row in df.iterrows():
+                candle = {"open": float(row["open"]), "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"])}
+                old_status = trade["status"]
+                trade = update_position_status(trade, candle, atr_val)
+                if trade["status"] == "closed" and old_status != "closed":
+                    finalize_close(trade, atr_val)
+                    try:
+                        open_trades.remove(trade)
+                    except ValueError:
+                        pass
+                    break
+        except Exception as e:
+            tlog(f"⚠️ catch-up error for {trade.get('symbol','?')}: {e}")
+
+    # Persist residual opens
+    try:
+        save_open_positions(open_trades)
+    except Exception as e:
+        tlog(f"⚠️ catch-up save_open_positions failed: {e}")
 
 def _get_features_for_symbol(symbol: str, interval: str = None, limit: int = 100):
     """
@@ -90,17 +127,21 @@ def _get_features_for_symbol(symbol: str, interval: str = None, limit: int = 100
 
 def run_bot():
     load_dotenv()
-
     tlog("🚀 TitanBot-Paper starting…")
     try:
-        # ✅ start Telegram polling in the background, then send startup notice
         Thread(target=run_telegram_polling, daemon=True).start()
         send_startup_notice()
         tlog("☎️ Telegram polling started (background).")
     except Exception as e:
         tlog(f"⚠️ Telegram startup notice failed (continuing): {e}")
 
-    open_trades = []                 # list of trade dicts (status=open/closed)
+    # ✅ Rehydrate open trades from disk (if any)
+    open_trades = load_open_positions()
+    if open_trades:
+        tlog(f"🔁 Rehydrated {len(open_trades)} open trade(s) from last session.")
+        _catch_up_open_positions(open_trades)
+    else:
+        open_trades = []
     symbol_cooldowns = {}            # {symbol: epoch_until}
     symbol_atr_cache = {}            # {symbol: last_atr_val}
 

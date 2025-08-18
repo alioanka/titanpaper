@@ -2,6 +2,7 @@
 import uuid
 from config import TP_MULTIPLIERS, SL_MULTIPLIER, TRAILING_START_AFTER_TP, TRAILING_GAP_ATR, PRICE_BUFFER_PCT
 from utils.terminal_logger import tlog
+import time
 
 def build_fake_trade(signal: dict, candle: dict, atr: float) -> dict:
     """
@@ -37,6 +38,7 @@ def build_fake_trade(signal: dict, candle: dict, atr: float) -> dict:
         "leverage": signal.get("leverage",1),
         "strategy": signal.get("strategy_name","basic_trend"),
         "duration_sec": 0,
+        "opened_at": time.strftime("%Y-%m-%d %H:%M:%S"),  # ✅ added (used for catch-up & bookkeeping)
         # pass-through fields for logging/ML if present
         "adx": signal.get("adx",0),
         "rsi": signal.get("rsi",0),
